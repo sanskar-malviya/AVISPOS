@@ -23,6 +23,10 @@ All are copied from *Firebase console → Project settings → General → Your 
 | `VITE_FIREBASE_APP_ID` | `1:1234567890:web:abc…` |
 | `VITE_USE_EMULATORS` | `false` (set `true` only to point a build at local emulators) |
 
+On **Netlify**, the same six `VITE_FIREBASE_*` values go in *Site configuration → Environment variables*
+(`.env` isn't uploaded to GitHub, so Netlify never sees it). A build missing them shows an "App is not
+configured" screen listing what to add.
+
 ## What is and isn't secret
 
 - **The `VITE_*` web config is not a secret.** It is compiled into the app that every browser downloads,

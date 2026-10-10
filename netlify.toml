@@ -1,0 +1,53 @@
+# Netlify hosts the web app (the PWA). Firebase still provides the database,
+# logins, photo storage and Cloud Functions — deploy those with
+# `npm run deploy` (see docs/DEPLOY.md).
+#
+# Required environment variables (Netlify → Site configuration → Environment
+# variables): VITE_FIREBASE_API_KEY, VITE_FIREBASE_AUTH_DOMAIN,
+# VITE_FIREBASE_PROJECT_ID, VITE_FIREBASE_STORAGE_BUCKET,
+# VITE_FIREBASE_MESSAGING_SENDER_ID, VITE_FIREBASE_APP_ID
+
+[build]
+  command = "npm run build"
+  publish = "dist"
+
+[build.environment]
+  NODE_VERSION = "22"
+
+# Single-page app: every route (/orders, /settings, …) serves index.html.
+# Netlify only applies this when no real file matches, so assets are untouched.
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
+
+# The service worker and the page shell must never be cached, or tablets would
+# keep running an old version after an update.
+[[headers]]
+  for = "/sw.js"
+  [headers.values]
+    Cache-Control = "no-cache"
+
+[[headers]]
+  for = "/index.html"
+  [headers.values]
+    Cache-Control = "no-cache"
+
+[[headers]]
+  for = "/manifest.webmanifest"
+  [headers.values]
+    Cache-Control = "no-cache"
+    Content-Type = "application/manifest+json"
+
+# Hashed build assets never change, so they can be cached forever.
+[[headers]]
+  for = "/assets/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
+
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "strict-origin-when-cross-origin"
+    X-Frame-Options = "DENY"

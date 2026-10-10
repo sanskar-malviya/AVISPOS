@@ -17,7 +17,8 @@
     "bootstrap-owner": "tsx scripts/bootstrap-owner.ts",
     "emulators": "npm run build:functions && cross-env FUNCTIONS_DISCOVERY_TIMEOUT=60 firebase emulators:start --project demo-aviz-pos",
     "dev:emu": "npm run build:functions && concurrently -k -n emu,web \"cross-env FUNCTIONS_DISCOVERY_TIMEOUT=60 firebase emulators:start --project demo-aviz-pos\" \"vite --mode emulator\"",
-    "deploy": "npm run build && cross-env FUNCTIONS_DISCOVERY_TIMEOUT=60 firebase deploy"
+    "deploy": "cross-env FUNCTIONS_DISCOVERY_TIMEOUT=60 firebase deploy --only firestore,storage,functions",
+    "deploy:firebase-hosting": "npm run build && firebase deploy --only hosting"
   },
   "dependencies": {
     "firebase": "^10.14.1",

@@ -21,7 +21,8 @@ UPI, and a Bluetooth thermal printer prints the receipt. An ordinary order takes
 ## Tech stack
 
 - **Frontend:** React 18 + TypeScript + Vite + Tailwind CSS, installable **PWA** (works full-screen, landscape)
-- **Backend:** Firebase — Firestore (with offline persistence), Authentication, Cloud Storage, Hosting,
+- **Hosting:** Netlify (auto-deploys from GitHub; config in `netlify.toml`)
+- **Backend:** Firebase — Firestore (with offline persistence), Authentication, Cloud Storage,
   Cloud Functions (Node 22, region `asia-south1` Mumbai)
 - **Money** is stored as **integer paise** everywhere; every order keeps a price snapshot, so later price
   changes never alter past receipts or reports.
@@ -34,8 +35,9 @@ UPI, and a Bluetooth thermal printer prints the receipt. An ordinary order takes
  │   │ (orders queue & sync when online)     │        │   └─► Cloud Functions: validate orders,  │
  │   └ Web Bluetooth ──► BLE thermal printer │        │       reconcile offline numbers, audit,  │
  └───────────────────────────────────────────┘        │       staff management                   │
-                                                      │ Storage (product photos) · Hosting (app) │
+                                                      │ Storage (product photos)                 │
                                                       └──────────────────────────────────────────┘
+ The app itself is served by Netlify (HTTPS), auto-deployed from GitHub.
 ```
 
 ## Quick start (local, no cloud account needed)
@@ -67,15 +69,15 @@ Open <http://localhost:5173> and sign in. The emulator dashboard is at <http://l
 | `npm run test:rules` | Firestore security-rules tests (starts the Firestore emulator itself) |
 | `npm run test:e2e` | Full acceptance test in a real browser (needs `npm run dev:emu` running) |
 | `npm run typecheck` | TypeScript check |
-| `npm run build` | Production build into `dist/` |
-| `npm run deploy` | Build and deploy everything to Firebase |
+| `npm run build` | Production build into `dist/` (Netlify runs this automatically) |
+| `npm run deploy` | Deploy the Firebase backend: Firestore/Storage rules + Cloud Functions |
 | `npm run seed` / `npm run bootstrap-owner` | One-off setup scripts (add `-- --emulator` for local) |
 
 ## Documentation
 
 | Guide | For |
 |---|---|
-| [docs/DEPLOY.md](docs/DEPLOY.md) | Setting up the Firebase project and going live |
+| [docs/DEPLOY.md](docs/DEPLOY.md) | Going live: Firebase backend + Netlify website |
 | [docs/ENV.md](docs/ENV.md) | Configuration files and how secrets are handled |
 | [docs/SETUP.md](docs/SETUP.md) | Owner's first-time setup: products, prices, photos, receipt, staff |
 | [docs/PRINTER.md](docs/PRINTER.md) | Choosing, pairing and troubleshooting the receipt printer |

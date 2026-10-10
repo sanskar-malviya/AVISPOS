@@ -21,7 +21,7 @@ nothing. You only pay for usage *above* the free quotas.
 | Cloud Functions | ~2 calls per order + staff admin | ~600–900 | 2,000,000/month | ₹0 |
 | Authentication | email/password logins | a few | 50,000 monthly users | ₹0 |
 | Cloud Storage | product photos (~100 KB each) | a few MB | small; regional rates of a few cents/GB | ≈ ₹0–₹5/month |
-| Hosting | app downloads (cached on the tablet) | a few MB | 10 GB stored, 360 MB/day | ₹0 |
+| Netlify (website) | app downloads (cached on the tablet) + a build per push | a few MB | Free plan — far beyond one stall's needs (see netlify.com/pricing) | ₹0 |
 | Artifact Registry | container images from deploying Functions | ~0.5–1 GB | 0.5 GB | ₹0–₹10/month (keep the cleanup policy on) |
 | Cloud Build | builds when deploying Functions | minutes per deploy | 120 build-min/day | ₹0 |
 
