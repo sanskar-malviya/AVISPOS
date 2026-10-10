@@ -1,0 +1,40 @@
+// Minimal ESC/POS encoder for 58/80 mm thermal printers.
+import type { ReceiptLine } from './receipt';
+
+const ESC = 0x1b;
+const GS = 0x1d;
+const LF = 0x0a;
+
+/**
+ * Thermal printers use single-byte code pages (usually PC437) that lack ₹ and
+ * most non-Latin glyphs. Map ₹ to "Rs.", strip accents, and replace anything
+ * else outside printable ASCII so the printer never prints garbage.
+ */
+export function toPrinterText(text: string): string {
+  return text
+    .replace(/₹/g, 'Rs.')
+    .normalize('NFKD')
+    .replace(/[̀-ͯ]/g, '')
+    .replace(/[^\x20-\x7e]/g, '?');
+}
+
+export function encodeEscPos(
+  lines: ReceiptLine[],
+  opts: { feedLines?: number; cut?: boolean } = {},
+): Uint8Array {
+  const out: number[] = [
+    ESC, 0x40, // initialise printer
+    ESC, 0x74, 0x00, // code page PC437 (ASCII-safe)
+  ];
+  for (const line of lines) {
+    out.push(ESC, 0x61, line.align === 'center' ? 1 : 0); // alignment
+    out.push(ESC, 0x45, line.bold ? 1 : 0); // emphasis
+    out.push(GS, 0x21, line.large ? 0x01 : 0x00); // double height
+    for (const ch of toPrinterText(line.text)) out.push(ch.charCodeAt(0));
+    out.push(LF);
+  }
+  out.push(ESC, 0x61, 0, ESC, 0x45, 0, GS, 0x21, 0); // reset styles
+  out.push(ESC, 0x64, opts.feedLines ?? 4); // feed paper past the tear bar
+  if (opts.cut) out.push(GS, 0x56, 0x42, 0x00); // partial cut (ignored if no cutter)
+  return new Uint8Array(out);
+}

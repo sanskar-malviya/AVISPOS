@@ -1,0 +1,140 @@
+rules_version = '2';
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Aviz Food Point POS — Firestore security rules
+//
+// Roles come from Firebase Auth custom claims set by owner-only Cloud Functions
+// (or the one-off bootstrap-owner script):  role == 'owner' | 'cashier'.
+// Cloud Functions use the Admin SDK and are not subject to these rules.
+// ─────────────────────────────────────────────────────────────────────────────
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() { return request.auth != null; }
+    function isOwner()  { return signedIn() && request.auth.token.role == 'owner'; }
+    function isStaff()  {
+      return signedIn() && request.auth.token.role in ['owner', 'cashier'];
+    }
+
+    // ── Products ────────────────────────────────────────────────────────────
+    function validProduct(p) {
+      return p.name is string && p.name.size() > 0 && p.name.size() <= 40
+        && p.pricePaise is int && p.pricePaise > 0 && p.pricePaise <= 9999900
+        && p.active is bool && p.available is bool
+        && p.sortOrder is number
+        && p.imageUrl is string
+        && p.updatedBy == request.auth.uid;
+    }
+
+    match /products/{productId} {
+      allow read: if isStaff();
+      allow create, update: if isOwner() && validProduct(request.resource.data);
+      // Never delete products: past orders reference them. Deactivate instead.
+      allow delete: if false;
+    }
+
+    // ── Orders ──────────────────────────────────────────────────────────────
+    function validNewOrder(d, orderId) {
+      return d.keys().hasOnly([
+          'id', 'orderNumber', 'orderNumberProvisional', 'createdAt', 'clientCreatedAt',
+          'dateKey', 'items', 'subtotalPaise', 'grandTotalPaise', 'paymentMethod',
+          'paymentStatus', 'status', 'cashierUid', 'deviceId', 'reprintCount',
+          'validated', 'validationErrors', 'provisionalNumber', 'source', 'statusReason'])
+        && d.id == orderId
+        && d.cashierUid == request.auth.uid
+        && d.dateKey is string && d.dateKey.matches('^[0-9]{8}$')
+        && ((d.orderNumberProvisional == false
+              && d.orderNumber.matches('^' + d.dateKey + '-[0-9]{4,}$'))
+            || (d.orderNumberProvisional == true
+              && d.orderNumber.matches('^OFF-[A-Za-z0-9]+-[0-9]{8}-[0-9]{3,}$')))
+        // Server time, not device time, for the official timestamp.
+        && d.createdAt == request.time
+        && d.clientCreatedAt is int
+        && d.items is list && d.items.size() > 0 && d.items.size() <= 50
+        && d.subtotalPaise is int && d.subtotalPaise > 0
+        && d.grandTotalPaise == d.subtotalPaise
+        // Orders are only ever written once payment is confirmed.
+        && d.paymentMethod in ['cash', 'upi']
+        && d.paymentStatus == 'paid'
+        && d.status == 'completed'
+        // Fields only the server may set.
+        && d.reprintCount == 0
+        && d.validated == false
+        && d.validationErrors.size() == 0
+        && d.provisionalNumber == ''
+        && d.statusReason == ''
+        && d.source in ['online', 'offline']
+        && d.deviceId is string;
+      // Per-line maths (qty × price, sum of lines) can't be looped over in
+      // rules; the onOrderCreated Cloud Function re-checks every line against
+      // the menu and flags any mismatch.
+    }
+
+    function isReprint() {
+      return request.resource.data.diff(resource.data).affectedKeys().hasOnly(['reprintCount'])
+        && request.resource.data.reprintCount == resource.data.reprintCount + 1;
+    }
+
+    function isStatusChange() {
+      return resource.data.status == 'completed'
+        && request.resource.data.status in ['cancelled', 'refunded']
+        && request.resource.data.diff(resource.data).affectedKeys()
+             .hasOnly(['status', 'statusReason', 'statusChangedBy', 'statusChangedAt'])
+        && request.resource.data.statusChangedBy == request.auth.uid
+        && request.resource.data.statusChangedAt == request.time
+        && request.resource.data.statusReason is string
+        && request.resource.data.statusReason.size() > 0
+        && request.resource.data.statusReason.size() <= 200;
+    }
+
+    match /orders/{orderId} {
+      // Cashiers may fetch a single order (needed by the idempotent checkout
+      // transaction); only owners may list / browse order history.
+      allow get: if isStaff();
+      allow list: if isOwner();
+      allow create: if isStaff() && validNewOrder(request.resource.data, orderId);
+      allow update: if (isStaff() && isReprint()) || (isOwner() && isStatusChange());
+      // Completed sales can never be deleted from the app.
+      allow delete: if false;
+    }
+
+    // ── Daily order-number counters ─────────────────────────────────────────
+    // Can only ever move forward by exactly one, so numbers are never reused.
+    match /counters/{dk} {
+      allow read: if isStaff();
+      allow create: if isStaff()
+        && request.resource.data.keys().hasOnly(['seq', 'dateKey'])
+        && request.resource.data.seq == 1
+        && request.resource.data.dateKey == dk;
+      allow update: if isStaff()
+        && request.resource.data.keys().hasOnly(['seq', 'dateKey'])
+        && request.resource.data.seq == resource.data.seq + 1
+        && request.resource.data.dateKey == dk;
+      allow delete: if false;
+    }
+
+    // ── Settings ────────────────────────────────────────────────────────────
+    match /settings/business {
+      allow read: if isStaff();
+      allow write: if isOwner()
+        && (!('paperWidth' in request.resource.data)
+            || request.resource.data.paperWidth in ['58', '80']);
+    }
+    // Owner PIN hash — owners only.
+    match /settings/security {
+      allow read, write: if isOwner();
+    }
+
+    // ── Audit log — written only by Cloud Functions ─────────────────────────
+    match /audit/{entryId} {
+      allow read: if isOwner();
+      allow write: if false;
+    }
+
+    // ── User profiles (mirror of roles; written only by Cloud Functions) ────
+    match /users/{uid} {
+      allow read: if isOwner() || (signedIn() && request.auth.uid == uid);
+      allow write: if false;
+    }
+  }
+}
