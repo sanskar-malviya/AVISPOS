@@ -10,9 +10,9 @@ export interface DefaultProduct {
 }
 
 export const DEFAULT_PRODUCTS: DefaultProduct[] = [
-  { name: 'Chole Bhature', pricePaise: 9000, image: '/products/chole-bhature.svg' },
-  { name: 'Pav Bhaji', pricePaise: 7000, image: '/products/pav-bhaji.svg' },
-  { name: 'Veg Biryani', pricePaise: 5000, image: '/products/veg-biryani.svg' },
-  { name: 'Chole Kulche', pricePaise: 6000, image: '/products/chole-kulche.svg' },
-  { name: 'Vada Pav', pricePaise: 3000, image: '/products/vada-pav.svg' },
+  { name: 'Chole Bhature', pricePaise: 9000, image: '/products/chole-bhature.jpg' },
+  { name: 'Pav Bhaji', pricePaise: 7000, image: '/products/pav-bhaji.jpg' },
+  { name: 'Veg Biryani', pricePaise: 5000, image: '/products/veg-biryani.jpg' },
+  { name: 'Chole Kulche', pricePaise: 6000, image: '/products/chole-kulche.jpg' },
+  { name: 'Vada Pav', pricePaise: 3000, image: '/products/vada-pav.jpg' },
 ];

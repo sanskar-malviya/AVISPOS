@@ -8,7 +8,7 @@ interface ProductCardProps {
   onTap: () => void;
 }
 
-const FALLBACK_IMG = '/products/placeholder.svg';
+const FALLBACK_IMG = '/products/placeholder.jpg';
 
 /**
  * Large, tappable food card. One tap adds +1 (handled by parent). Shows a live

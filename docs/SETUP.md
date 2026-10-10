@@ -26,9 +26,9 @@ For each product you can:
 
 Products are never deleted, so old orders and reports always stay correct.
 
-**Photos:** use bright, close-up, landscape photos of the actual dish on a plain background. The bundled
-pictures are illustrations to get you started; replacing them with your own food photos makes the screen
-faster to read.
+**Photos:** the app ships with sample photos of each dish. For the best result, replace them over time
+with bright, close-up, landscape photos of *your own* plates. Use the same angle and background for all
+of them so the screen stays easy to read.
 
 ## 3. Business and receipt
 
