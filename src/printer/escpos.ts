@@ -20,12 +20,13 @@ export function toPrinterText(text: string): string {
 
 export function encodeEscPos(
   lines: ReceiptLine[],
-  opts: { feedLines?: number; cut?: boolean } = {},
+  opts: { feedLines?: number; cut?: boolean; logo?: Uint8Array } = {},
 ): Uint8Array {
   const out: number[] = [
     ESC, 0x40, // initialise printer
     ESC, 0x74, 0x00, // code page PC437 (ASCII-safe)
   ];
+  if (opts.logo) for (const b of opts.logo) out.push(b); // raster logo, see logo.ts
   for (const line of lines) {
     out.push(ESC, 0x61, line.align === 'center' ? 1 : 0); // alignment
     out.push(ESC, 0x45, line.bold ? 1 : 0); // emphasis

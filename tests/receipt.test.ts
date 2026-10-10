@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { buildReceiptLines, columnsFor, receiptHtml, wrap } from '../src/printer/receipt';
 import { encodeEscPos, toPrinterText } from '../src/printer/escpos';
+import { ditherToBitmap, escPosRaster } from '../src/printer/logo';
 import { DEFAULT_SETTINGS } from '../src/data/settingsDefaults';
 import { sampleOrder } from '../src/lib/sampleOrder';
 import type { BusinessSettings } from '../src/lib/types';
@@ -88,5 +89,40 @@ describe('ESC/POS', () => {
     expect([...bytes.slice(-4)]).toEqual([0x1d, 0x56, 0x42, 0x00]);
     for (const b of bytes) expect(b).toBeLessThan(0x80); // pure ASCII + control codes
     expect(new TextDecoder().decode(bytes)).toContain('Rs.180');
+  });
+});
+
+describe('receipt logo', () => {
+  it('dithers greyscale into a 1-bit bitmap (black = 1, leftmost dot = high bit)', () => {
+    const w = 16;
+    const h = 2;
+    const gray = new Float32Array(w * h).fill(255);
+    gray[0] = 0; // top-left dot black
+    gray[w + 15] = 0; // bottom-right dot black
+    const bmp = ditherToBitmap(gray, w, h);
+    expect([...bmp.bits]).toEqual([0x80, 0x00, 0x00, 0x01]);
+    // Mid-grey comes out as roughly half the dots.
+    const mid = ditherToBitmap(new Float32Array(64 * 64).fill(128), 64, 64);
+    const black = [...mid.bits].reduce((n, b) => n + b.toString(2).split('1').length - 1, 0);
+    expect(black / (64 * 64)).toBeGreaterThan(0.4);
+    expect(black / (64 * 64)).toBeLessThan(0.6);
+  });
+
+  it('prints the logo as a centred GS v 0 raster right after printer init', () => {
+    const bmp = { width: 16, height: 3, bits: new Uint8Array(6).fill(0xff) };
+    const raster = escPosRaster(bmp);
+    expect([...raster.slice(0, 11)]).toEqual([0x1b, 0x61, 1, 0x1d, 0x76, 0x30, 0, 2, 0, 3, 0]);
+    expect(raster.length).toBe(11 + 6 + 1);
+    const lines = buildReceiptLines(sampleOrder(), settings58, { currency: 'Rs.' });
+    const bytes = encodeEscPos(lines, { logo: raster });
+    expect([...bytes.slice(5, 5 + raster.length)]).toEqual([...raster]);
+  });
+
+  it('browser receipt shows the logo and a faint watermark only when asked', () => {
+    const lines = buildReceiptLines(sampleOrder(), settings58, { currency: '₹' });
+    expect(receiptHtml(lines, '58')).not.toContain('<img');
+    const html = receiptHtml(lines, '58', { logoUrl: 'https://x.test/brand/logo.jpg' });
+    expect(html).toContain('class="lg" src="https://x.test/brand/logo.jpg"');
+    expect(html).toContain('class="wm"');
   });
 });

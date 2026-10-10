@@ -71,6 +71,15 @@ Business name, tagline, optional heading/contact, order number, date & time, ite
 subtotal, **TOTAL**, payment method (Cash/UPI) and the footer. Thermal printers can't print the ₹ sign, so
 Bluetooth receipts show **Rs.**; browser-printed receipts show **₹**.
 
+**Logo.** The shop logo (`public/brand/logo.jpg`) is printed at the top of every receipt. On a thermal
+printer it comes out as a black-and-white dot pattern about 24 mm wide (30 mm on 80 mm paper); it adds
+about a second to printing. Thermal printers can't print text over an image, so the faint watermark behind
+the items appears only on browser-printed receipts and on screen. The on-screen receipt can't be selected
+or copied. Switch the logo off under *Settings → Business & receipt → Logo on receipts*.
+
+None of this makes a paper receipt impossible to copy, since anyone can photocopy one. To check whether a
+receipt is genuine, search its order number in **Orders**: a real one shows the same items, total and time.
+
 ## Fallbacks
 
 - **Classic-Bluetooth (SPP) or USB printer on Android:** install an ESC/POS *print service* app from the

@@ -8,7 +8,14 @@ import type { BusinessSettings, PaperWidth } from '../../lib/types';
 
 type Draft = Pick<
   BusinessSettings,
-  'businessName' | 'tagline' | 'contact' | 'receiptHeader' | 'receiptFooter' | 'paperWidth' | 'vegLabel'
+  | 'businessName'
+  | 'tagline'
+  | 'contact'
+  | 'receiptHeader'
+  | 'receiptFooter'
+  | 'paperWidth'
+  | 'vegLabel'
+  | 'receiptLogo'
 >;
 
 function pick(s: BusinessSettings): Draft {
@@ -20,6 +27,7 @@ function pick(s: BusinessSettings): Draft {
     receiptFooter: s.receiptFooter,
     paperWidth: s.paperWidth,
     vegLabel: s.vegLabel,
+    receiptLogo: s.receiptLogo,
   };
 }
 
@@ -129,6 +137,21 @@ export function BusinessTab() {
             ))}
           </div>
         </div>
+        <label className="flex items-start gap-3 cursor-pointer">
+          <input
+            type="checkbox"
+            className="mt-1 w-5 h-5 accent-tandoori-700"
+            checked={draft.receiptLogo}
+            onChange={(e) => set('receiptLogo', e.target.checked)}
+          />
+          <span>
+            <span className="block text-sm font-semibold text-stone-700">Logo on receipts</span>
+            <span className="block text-xs text-stone-500">
+              Printed at the top of every receipt. Browser prints also get a faint logo behind the
+              items. Adds about a second to Bluetooth printing.
+            </span>
+          </span>
+        </label>
         {field('vegLabel', 'Veg badge text', { max: 12 })}
 
         <div className="flex gap-3 pt-2">

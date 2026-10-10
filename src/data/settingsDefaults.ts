@@ -10,4 +10,5 @@ export const DEFAULT_SETTINGS: BusinessSettings = {
   paperWidth: '58',
   printer: { type: 'none' },
   vegLabel: 'VEG',
+  receiptLogo: true,
 };

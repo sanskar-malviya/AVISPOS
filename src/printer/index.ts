@@ -6,6 +6,7 @@ import { buildReceiptLines, receiptHtml } from './receipt';
 import { encodeEscPos } from './escpos';
 import { bluetoothPrint } from './bluetooth';
 import { printHtmlViaBrowser } from './browserPrint';
+import { LOGO_URL, escPosRaster, logoBitmap, logoDotsFor } from './logo';
 
 export type PrintMethod = 'bluetooth' | 'browser';
 
@@ -37,11 +38,19 @@ export async function printOrderReceipt(
   try {
     if (method === 'bluetooth') {
       const lines = buildReceiptLines(order, settings, { currency: 'Rs.', reprint: opts.reprint });
-      await bluetoothPrint(encodeEscPos(lines, { cut: true }));
+      // A logo that can't be prepared never blocks the receipt itself.
+      const logo = settings.receiptLogo
+        ? await logoBitmap(logoDotsFor(settings.paperWidth)).then(escPosRaster, () => undefined)
+        : undefined;
+      await bluetoothPrint(encodeEscPos(lines, { cut: true, logo }));
       return { ok: true, method, message: 'Receipt sent to the printer.' };
     }
     const lines = buildReceiptLines(order, settings, { currency: '₹', reprint: opts.reprint });
-    await printHtmlViaBrowser(receiptHtml(lines, settings.paperWidth));
+    await printHtmlViaBrowser(
+      receiptHtml(lines, settings.paperWidth, {
+        logoUrl: settings.receiptLogo ? new URL(LOGO_URL, location.origin).href : undefined,
+      }),
+    );
     return { ok: true, method, message: 'Print dialog opened — tap Print there to finish.' };
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);

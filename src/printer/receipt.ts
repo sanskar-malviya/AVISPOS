@@ -126,9 +126,18 @@ function escapeHtml(s: string): string {
 }
 
 /** Standalone HTML document for the browser-print fallback, sized to the roll. */
-export function receiptHtml(lines: ReceiptLine[], width: PaperWidth): string {
+export function receiptHtml(
+  lines: ReceiptLine[],
+  width: PaperWidth,
+  opts: { logoUrl?: string } = {},
+): string {
   const pageW = width === '80' ? '80mm' : '58mm';
   const contentW = width === '80' ? '72mm' : '48mm';
+  // Logo at the top plus a faint copy behind the items. Plain <img> elements,
+  // because browsers leave CSS backgrounds out of prints by default.
+  const logo = opts.logoUrl
+    ? `<img class="lg" src="${escapeHtml(opts.logoUrl)}" alt=""><img class="wm" src="${escapeHtml(opts.logoUrl)}" alt="">`
+    : '';
   const body = lines
     .map((l) => {
       const cls = [l.align === 'center' ? 'c' : 'l', l.bold ? 'b' : '', l.large ? 'g' : '']
@@ -146,5 +155,11 @@ html, body { margin: 0; padding: 0; background: #fff; color: #000; }
 .c { text-align: center; white-space: pre-wrap; }
 .b { font-weight: 700; }
 .g { font-size: 3.6mm; }
-</style></head><body><div class="r">${body}</div></body></html>`;
+.r { position: relative; }
+.r > div { position: relative; z-index: 1; }
+.lg { display: block; width: 22mm; height: 22mm; margin: 0 auto 2mm; border-radius: 50%; }
+.wm { position: absolute; z-index: 0; left: 50%; top: 50%; width: 80%; aspect-ratio: 1;
+      transform: translate(-50%, -50%); border-radius: 50%; opacity: 0.1; filter: grayscale(1); }
+* { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+</style></head><body><div class="r">${logo}${body}</div></body></html>`;
 }

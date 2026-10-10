@@ -70,6 +70,7 @@ export interface BusinessSettings {
   paperWidth: PaperWidth;
   printer: PrinterConfig;
   vegLabel: string; // short veg indicator text, e.g. "VEG"
+  receiptLogo: boolean; // print the shop logo on receipts
 }
 // NOTE: the owner PIN hash is deliberately NOT part of BusinessSettings. It lives
 // in settings/security, which only owner accounts can read (see firestore.rules).

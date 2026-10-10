@@ -27,6 +27,7 @@ function mapSettings(data: Record<string, unknown> | undefined): BusinessSetting
       ...(printer.deviceName ? { deviceName: String(printer.deviceName) } : {}),
     },
     vegLabel: String(data.vegLabel ?? DEFAULT_SETTINGS.vegLabel),
+    receiptLogo: data.receiptLogo !== false,
   };
 }
 
