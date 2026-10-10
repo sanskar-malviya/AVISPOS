@@ -2,11 +2,13 @@ import { useState } from 'react';
 import { useShopData } from '../../app/data';
 import { useToast } from '../../components/Toast';
 import {
+  addMissingDefaultProducts,
   reorderProducts,
   seedDefaultProducts,
   setActive,
   setAvailability,
 } from '../../data/products';
+import { DEFAULT_PRODUCTS, missingDefaultProducts } from '../../lib/defaultProducts';
 import { formatINR } from '../../lib/money';
 import type { Product } from '../../lib/types';
 import { ProductEditor } from './ProductEditor';
@@ -70,6 +72,10 @@ export function ProductsTab() {
 
   if (loading) return <p className="text-stone-400">Loading…</p>;
 
+  const missing = products.length > 0 ? missingDefaultProducts(products) : [];
+  const listItems = (items: typeof DEFAULT_PRODUCTS) =>
+    items.map((p) => `${p.name} ${formatINR(p.pricePaise)}`).join(', ');
+
   return (
     <div className="max-w-4xl">
       <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
@@ -84,12 +90,31 @@ export function ProductsTab() {
         </button>
       </div>
 
+      {missing.length > 0 && (
+        <div className="card p-4 mb-4 flex flex-wrap items-center justify-between gap-3">
+          <p className="text-sm">
+            <span className="font-semibold">New on the standard menu:</span> {listItems(missing)}
+          </p>
+          <button
+            className="btn-primary"
+            disabled={seeding}
+            onClick={async () => {
+              setSeeding(true);
+              await run(() => addMissingDefaultProducts(products), 'Items added to the menu');
+              setSeeding(false);
+            }}
+          >
+            {seeding ? 'Adding…' : 'Add to menu'}
+          </button>
+        </div>
+      )}
+
       {products.length === 0 ? (
         <div className="card p-6 text-center">
           <p className="font-semibold">No products yet.</p>
           <p className="text-sm text-stone-500 mt-1">
-            Load the standard Avi's Food Corner menu (Chole Bhature ₹90, Pav Bhaji ₹70, Veg Biryani ₹50, Chole
-            Kulche ₹60, Vada Pav ₹30) or add items one by one.
+            Load the standard Avi's Food Corner menu ({listItems(DEFAULT_PRODUCTS)}) or add items one
+            by one.
           </p>
           <button
             className="btn-primary mt-4"

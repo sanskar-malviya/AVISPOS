@@ -100,13 +100,16 @@ try {
   await login('owner@aviz.test', 'Owner@12345');
   await shot('02-billing-empty');
 
-  const expected = { 'Chole Bhature': 90, 'Pav Bhaji': 70, 'Veg Biryani': 50, 'Chole Kulche': 60, 'Vada Pav': 30 };
+  const expected = {
+    'Chole Bhature': 90, 'Pav Bhaji': 70, 'Veg Biryani': 50, 'Chole Kulche': 60, 'Vada Pav': 30,
+    'Extra Bhatura': 20, 'Extra Pav': 10, 'Extra Kulcha': 15,
+  };
   let pricesOk = true;
   for (const [n, p] of Object.entries(expected)) {
     const t = await card(n).innerText();
     if (!t.includes(`₹${p}`)) pricesOk = false;
   }
-  check('T4  Five default products show the correct prices', pricesOk);
+  check('T4  Default products show the correct prices', pricesOk);
   const imgsLoaded = await page.evaluate(() =>
     [...document.querySelectorAll('main section img')].every((i) => i.complete && i.naturalWidth > 0),
   );
@@ -350,7 +353,7 @@ try {
   const backup = JSON.parse(readFileSync(backupPath, 'utf8'));
   check(
     '     Owner can back up today and download the file (all of today\'s orders + menu)',
-    backup.format === 'avis-pos-backup' && backup.orders.length === (await orders()).length && backup.products.length === 5,
+    backup.format === 'avis-pos-backup' && backup.orders.length === (await orders()).length && backup.products.length === 8,
     `${backup.orders.length} orders, ${backup.audit.length} audit entries`,
   );
   await shot('14-staff-backups');

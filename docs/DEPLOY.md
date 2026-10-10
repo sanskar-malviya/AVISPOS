@@ -89,7 +89,8 @@ npm run bootstrap-owner -- you@gmail.com "YourStrongPassword"
 npm run seed
 ```
 
-You should see `✔ … is now an OWNER` and the five products listed. `seed` only fills an empty database.
+You should see `✔ … is now an OWNER` and the eight products listed. On an existing database `seed` only adds
+default menu items that are missing (e.g. the extra bread add-ons); nothing else is changed.
 Staff accounts are then created inside the app (*Settings → PIN, staff & backups*).
 
 ## 4. The tablet

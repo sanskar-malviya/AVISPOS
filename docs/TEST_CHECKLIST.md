@@ -20,7 +20,7 @@ Testing happens on two levels:
 | 1 | Tap Chole Bhature twice → quantity 2 | unit `cart` + e2e T1 (badge "2", single order line) | ☐ |
 | 2 | Multiple products → correct grand total | unit `cart` + e2e T2 (₹210) | ☐ |
 | 3 | Decrease/remove → total updates immediately | unit `cart` + e2e T3 | ☐ |
-| 4 | Five default prices correct | unit `money-and-defaults` + e2e T4 | ☐ |
+| 4 | Default prices correct (incl. Extra Bhatura ₹20, Extra Pav ₹10, Extra Kulcha ₹15) | unit `money-and-defaults` + e2e T4 | ☐ |
 | 5 | Owner changes a price → new price on future orders | e2e T5 (Vada Pav ₹30 → ₹35) + audit entry | ☐ |
 | 6 | Completed order keeps its original price | unit `receipt` + e2e T6 | ☐ |
 | 7 | Cash or UPI can be selected and confirmed | e2e T7 | ☐ |

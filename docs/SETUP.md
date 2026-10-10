@@ -10,8 +10,10 @@ else. After 5 wrong attempts the PIN pad locks for 30 seconds.
 
 ## 2. Check the menu
 
-**Settings → Products.** The five default items are already there (Chole Bhature ₹90, Pav Bhaji ₹70, Veg
-Biryani ₹50, Chole Kulche ₹60, Vada Pav ₹30). If the list is empty, tap **Load default menu**.
+**Settings → Products.** The default items are already there (Chole Bhature ₹90, Pav Bhaji ₹70, Veg
+Biryani ₹50, Chole Kulche ₹60, Vada Pav ₹30, and the add-ons Extra Bhatura ₹20, Extra Pav ₹10, Extra
+Kulcha ₹15 per piece). If the list is empty, tap **Load default menu**. If a menu set up earlier is
+missing the add-ons, a **New on the standard menu** box appears at the top — tap **Add to menu**.
 
 For each product you can:
 

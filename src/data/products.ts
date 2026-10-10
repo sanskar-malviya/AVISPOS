@@ -11,7 +11,11 @@ import {
   type WriteBatch,
 } from 'firebase/firestore';
 import { auth, db } from '../lib/firebase';
-import { DEFAULT_PRODUCTS } from '../lib/defaultProducts';
+import {
+  DEFAULT_PRODUCTS,
+  defaultProductId,
+  missingDefaultProducts,
+} from '../lib/defaultProducts';
 import type { Product } from '../lib/types';
 
 const productsCol = collection(db, 'products');
@@ -176,16 +180,11 @@ export async function reorderProducts(orderedIds: string[]): Promise<void> {
 }
 
 /** Slug used as the doc id for the default products (stable, human-readable). */
-export function slugify(name: string): string {
-  return name
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/(^-|-$)/g, '');
-}
+export const slugify = defaultProductId;
 
 /**
- * Load the five default menu items (spec §3). Only intended for a fresh,
- * empty catalogue — the Settings screen offers it when no products exist.
+ * Load the default menu items (spec §3). Only intended for a fresh, empty
+ * catalogue — the Settings screen offers it when no products exist.
  */
 export async function seedDefaultProducts(): Promise<void> {
   for (const [i, p] of DEFAULT_PRODUCTS.entries()) {
@@ -193,6 +192,22 @@ export async function seedDefaultProducts(): Promise<void> {
       name: p.name,
       pricePaise: p.pricePaise,
       sortOrder: i,
+      imageUrl: p.image,
+    });
+  }
+}
+
+/**
+ * Add default menu items an existing catalogue is missing (e.g. the extra
+ * bread add-ons), at the end of the menu. Existing products are untouched.
+ */
+export async function addMissingDefaultProducts(existing: Product[]): Promise<void> {
+  let sortOrder = Math.max(-1, ...existing.map((p) => p.sortOrder)) + 1;
+  for (const p of missingDefaultProducts(existing)) {
+    await createProductAt(slugify(p.name), {
+      name: p.name,
+      pricePaise: p.pricePaise,
+      sortOrder: sortOrder++,
       imageUrl: p.image,
     });
   }
