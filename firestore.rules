@@ -95,10 +95,15 @@ service cloud.firestore {
         && d.checked == false
         && d.validated == false
         && d.validationErrors.size() == 0
-        && d.provisionalNumber == ''
+        // An online order may carry the device's backup number: the number
+        // printed if the server was too slow to answer before the receipt.
+        && (d.provisionalNumber == ''
+            || (d.orderNumberProvisional == false
+              && d.provisionalNumber.matches(
+                   '^OFF-' + d.deviceId + '-' + d.dateKey + '-[0-9]{3,}$')))
         && d.statusReason == ''
         && d.source in ['online', 'offline']
-        && d.deviceId is string;
+        && d.deviceId is string && d.deviceId.matches('^[A-Za-z0-9]{1,32}$');
       // Per-line maths (qty × price, sum of lines) can't be looped over in
       // rules; the process-orders server function re-checks every line
       // against the menu and flags any mismatch.

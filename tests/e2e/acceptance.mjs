@@ -293,7 +293,7 @@ try {
   await card('Veg Biryani').waitFor();
   const before = (await orders()).length;
   await context.setOffline(true);
-  await page.getByText(/Offline — orders are being saved/).waitFor({ timeout: 5000 });
+  await page.getByText(/Offline — sales are saved on this device/).waitFor({ timeout: 5000 });
   await card('Veg Biryani').tap();
   await shot('11-offline-billing');
   await payCash();

@@ -86,7 +86,9 @@ export function OrderDetail() {
 
   const rows: [string, string][] = [
     ['Order No.', current.orderNumber],
-    ...(current.provisionalNumber
+    // Online orders also keep a backup number (used only if the server was too
+    // slow); show it just for orders that were really sold offline.
+    ...(current.provisionalNumber && current.source === 'offline'
       ? ([['Offline receipt no.', current.provisionalNumber]] as [string, string][])
       : []),
     ['Date & time', formatDateTime(orderTime(current))],

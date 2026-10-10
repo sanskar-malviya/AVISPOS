@@ -4,9 +4,14 @@ Testing happens on two levels:
 
 1. **Automated**, on any computer. These ran and passed on 10 Oct 2026:
    - `npm test`: 33 unit tests (cart, money, defaults, receipt layout, ESC/POS, reports/CSV, server validation, backup format)
-   - `npm run test:rules`: 30 Firestore security-rules tests (incl. audit-log enforcement)
+   - `npm run test:rules`: 31 Firestore security-rules tests (incl. audit-log enforcement)
    - `npm run test:e2e`: 43 checks driving the real app in a browser against the Firebase emulators,
      tablet-sized landscape window with touch
+   - A production build was also checked on a phone-sized screen (360 and 390 px wide, no sideways
+     scrolling on any screen), on a slow network (first sale falls back to a device save in about
+     5 s, later sales are instant, then sync and are found by the `OFF-…` receipt number), and offline
+     (reloading keeps the unsynced sales, the app opens offline even after the sign-in token expired,
+     and sign-out warns about sales not yet uploaded)
 2. **On the real tablet and printer.** These must be done by hand before going live, because hardware can't
    be automated. Tick each box.
 
@@ -55,8 +60,14 @@ Use the real tablet, the real printer, the deployed app URL and a **cashier** lo
 
 **Offline (13)**
 - [ ] Turn Wi-Fi/data **off** → orange Offline bar → make 2 sales → each says "Saved on this device".
+- [ ] While still offline, close the app completely and open it again → billing opens; *Orders* still
+      shows both sales as "Not synced".
 - [ ] Turn internet **on** → within a minute both appear in *Orders* with normal order numbers. Searching
       the printed `OFF-…` number finds them.
+
+**Phone (optional, if staff also bill on a phone)**
+- [ ] Open the app on the phone upright → products in two columns, total and **Pay →** at the bottom; tap
+      the total to see and change the order.
 
 **Owner (5, 6, 12)**
 - [ ] Change a price → billing shows it at once → new sale uses it; an older order still shows the old price.

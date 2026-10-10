@@ -25,22 +25,58 @@ interface AuthValue {
 
 const AuthContext = createContext<AuthValue | null>(null);
 
+const ROLE_KEY = 'aviz.role.';
+const ROLE_WAIT_MS = 4000;
+
+function rememberedRole(uid: string): Role {
+  try {
+    return localStorage.getItem(ROLE_KEY + uid) === 'owner' ? 'owner' : 'cashier';
+  } catch {
+    return 'cashier';
+  }
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [role, setRole] = useState<Role>('cashier');
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const unsub = onAuthStateChanged(auth, async (u) => {
+    const unsub = onAuthStateChanged(auth, (u) => {
       setUser(u);
-      if (u) {
-        // Role comes from a custom claim set server-side (owner|cashier).
-        const token = await u.getIdTokenResult();
-        setRole(token.claims.role === 'owner' ? 'owner' : 'cashier');
-      } else {
+      if (!u) {
         setRole('cashier');
+        setLoading(false);
+        return;
       }
-      setLoading(false);
+      // Role comes from a custom claim set server-side (owner|cashier). Reading
+      // it may need to renew the sign-in token, which needs the internet. When
+      // the app is opened offline or on a very slow line, use the role this
+      // device saw last time instead of waiting, so billing opens at once. (The
+      // role only shapes the screens; the security rules check the real token.)
+      let settled = false;
+      const fallback = setTimeout(() => {
+        settled = true;
+        setRole(rememberedRole(u.uid));
+        setLoading(false);
+      }, ROLE_WAIT_MS);
+      u.getIdTokenResult()
+        .then((token) => {
+          const r: Role = token.claims.role === 'owner' ? 'owner' : 'cashier';
+          try {
+            localStorage.setItem(ROLE_KEY + u.uid, r);
+          } catch {
+            /* storage unavailable */
+          }
+          setRole(r);
+        })
+        .catch(() => {
+          if (!settled) setRole(rememberedRole(u.uid));
+        })
+        .finally(() => {
+          clearTimeout(fallback);
+          setLoading(false);
+        });
     });
     return unsub;
   }, []);

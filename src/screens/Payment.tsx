@@ -127,8 +127,8 @@ export function Payment() {
 
             {saved.provisional && (
               <p className="mt-3 text-sm font-semibold text-amber-800 bg-amber-50 rounded-lg px-3 py-2">
-                Saved on this device (offline). It will sync automatically when the internet
-                returns — no need to re-enter it.
+                Saved on this device (internet off or slow). It syncs automatically when the
+                connection allows — no need to re-enter it.
               </p>
             )}
 

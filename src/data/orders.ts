@@ -12,6 +12,7 @@ import {
   serverTimestamp,
   setDoc,
   updateDoc,
+  waitForPendingWrites,
   where,
   writeBatch,
   type Timestamp,
@@ -58,7 +59,33 @@ export function formatOrderNumber(dk: string, seq: number): string {
   return `${dk}-${String(seq).padStart(4, '0')}`;
 }
 
-const TX_TIMEOUT_MS = 6000;
+const TX_TIMEOUT_MS = 5000;
+
+/**
+ * Weak-network mode. When a sale had to fall back to a device save because the
+ * server didn't answer in time, the next sales for a couple of minutes skip
+ * the server round-trip and save on the device straight away, so the cashier
+ * isn't kept waiting on every order. They sync (and get their final number)
+ * in the background as usual.
+ */
+const SLOW_MODE_MS = 2 * 60_000;
+let slowUntil = 0;
+let slowTimer: ReturnType<typeof setTimeout> | undefined;
+const slowListeners = new Set<(slow: boolean) => void>();
+
+function setSlow(slow: boolean) {
+  const was = Date.now() < slowUntil;
+  slowUntil = slow ? Date.now() + SLOW_MODE_MS : 0;
+  clearTimeout(slowTimer);
+  if (slow) slowTimer = setTimeout(() => setSlow(false), SLOW_MODE_MS);
+  if (was !== slow) slowListeners.forEach((l) => l(slow));
+}
+
+export function onSlowNetworkChange(listener: (slow: boolean) => void): () => void {
+  slowListeners.add(listener);
+  listener(Date.now() < slowUntil);
+  return () => slowListeners.delete(listener);
+}
 
 function withTimeout<T>(p: Promise<T>, ms: number): Promise<T> {
   return Promise.race([
@@ -114,10 +141,16 @@ function toStored(order: Order) {
  *   the order already exists (an earlier attempt actually succeeded) it is
  *   returned as-is; otherwise the counter is incremented and the order written
  *   atomically. No duplicate orders, no orphaned order numbers.
- * - OFFLINE (or the transaction can't reach the server in time): a provisional
- *   number is used and the write goes into Firestore's persistent offline queue.
- *   It is NOT awaited — an offline write only resolves on reconnect — but the
- *   order is already durably stored on the device and syncs automatically.
+ * - OFFLINE, ON A WEAK NETWORK, or when the transaction can't reach the server
+ *   in time: a provisional number is used and the write goes into Firestore's
+ *   persistent offline queue. It is NOT awaited — an offline write only
+ *   resolves on reconnect — but the order is already durably stored on the
+ *   device and syncs automatically.
+ *
+ * The provisional number is chosen before the transaction starts and stored on
+ * the online order too. On a slow line the transaction can still commit after
+ * we gave up waiting and printed the provisional number; the order is then
+ * still found by the number on that receipt.
  */
 export async function submitOrder(
   id: string,
@@ -127,8 +160,9 @@ export async function submitOrder(
   const dk = dateKey();
   const ref = doc(ordersCol, id);
   const online = typeof navigator !== 'undefined' ? navigator.onLine : true;
+  const fallbackNumber = provisionalNumber(dk, getDeviceId());
 
-  if (online) {
+  if (online && Date.now() >= slowUntil) {
     try {
       const order = await withTimeout(
         runTransaction(db, async (tx) => {
@@ -140,12 +174,14 @@ export async function submitOrder(
           const counter = await tx.get(counterRef);
           const seq = (counter.exists() ? Number(counter.data().seq ?? 0) : 0) + 1;
           const fresh = buildOrder(id, draft, opts.cashierUid, dk, formatOrderNumber(dk, seq), false);
+          fresh.provisionalNumber = fallbackNumber;
           tx.set(counterRef, { seq, dateKey: dk });
           tx.set(ref, toStored(fresh));
           return fresh;
         }),
         TX_TIMEOUT_MS,
       );
+      setSlow(false);
       requestServerCheck(); // verify totals on the server within seconds
       return { order, provisional: false };
     } catch (err) {
@@ -153,23 +189,38 @@ export async function submitOrder(
       const code = (err as { code?: string }).code ?? '';
       if (code === 'permission-denied' || code === 'invalid-argument') throw err;
       // Otherwise (network unavailable / timeout) fall through to offline save.
+      setSlow(true);
     }
   }
 
-  const order = buildOrder(
-    id,
-    draft,
-    opts.cashierUid,
-    dk,
-    provisionalNumber(dk, getDeviceId()),
-    true,
-  );
+  const order = buildOrder(id, draft, opts.cashierUid, dk, fallbackNumber, true);
   // Not awaited: resolves only once the server acknowledges (on reconnect).
-  setDoc(ref, toStored(order)).catch((e) => {
-    // eslint-disable-next-line no-console
-    console.error('[Aviz POS] queued order write rejected by server', id, e);
-  });
+  setDoc(ref, toStored(order))
+    .then(() => {
+      // Saved to the cloud: get it checked and renumbered now rather than at
+      // the next scheduled run.
+      requestServerCheck();
+    })
+    .catch((e) => {
+      // eslint-disable-next-line no-console
+      console.error('[Aviz POS] queued order write rejected by server', id, e);
+    });
   return { order, provisional: true };
+}
+
+/**
+ * True if this device still holds sales that haven't reached the cloud.
+ * Firestore keeps queued writes per signed-in account, so signing out now
+ * would hold them back until the same person signs in here again.
+ */
+export async function hasUnsyncedWrites(): Promise<boolean> {
+  return Promise.race([
+    waitForPendingWrites(db).then(
+      () => false,
+      () => false,
+    ),
+    new Promise<boolean>((resolve) => setTimeout(() => resolve(true), 1500)),
+  ]);
 }
 
 // ── Reads / history ──────────────────────────────────────────────────────────

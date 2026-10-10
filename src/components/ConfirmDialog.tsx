@@ -25,7 +25,7 @@ export function ConfirmDialog({
   if (!open) return null;
   return (
     <div
-      className="fixed inset-0 z-40 bg-black/40 grid place-items-center p-4"
+      className="fixed inset-0 z-50 bg-black/40 grid place-items-center p-4"
       onClick={onCancel}
       role="presentation"
     >

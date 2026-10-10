@@ -16,7 +16,8 @@ export default defineConfig({
         theme_color: '#b91c1c',
         background_color: '#fff7ed',
         display: 'fullscreen',
-        orientation: 'landscape',
+        // Tablet landscape is the main setup, but phones are used upright.
+        orientation: 'any',
         start_url: '/',
         icons: [
           { src: 'pwa-192.png', sizes: '192x192', type: 'image/png' },

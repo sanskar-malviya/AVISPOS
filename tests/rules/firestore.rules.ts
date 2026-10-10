@@ -267,6 +267,32 @@ describe('orders', () => {
     );
   });
 
+  it("an online order may carry this device's backup number, and nothing else", async () => {
+    const c = cashier();
+    await assertSucceeds(
+      setDoc(doc(c, 'orders/o2'), newOrder('cash1', { provisionalNumber: `OFF-dev1-${DK}-004` })),
+    );
+    // Another device's number, another day, a made-up value, or on an offline order: rejected.
+    await assertFails(setDoc(doc(c, 'orders/o2'), newOrder('cash1', { provisionalNumber: `OFF-dev2-${DK}-004` })));
+    await assertFails(setDoc(doc(c, 'orders/o2'), newOrder('cash1', { provisionalNumber: 'OFF-dev1-20200101-004' })));
+    await assertFails(setDoc(doc(c, 'orders/o2'), newOrder('cash1', { provisionalNumber: `${DK}-0001` })));
+    await assertFails(
+      setDoc(
+        doc(c, 'orders/o2'),
+        newOrder('cash1', {
+          orderNumber: `OFF-dev1-${DK}-001`,
+          orderNumberProvisional: true,
+          source: 'offline',
+          provisionalNumber: `OFF-dev1-${DK}-002`,
+        }),
+      ),
+    );
+    // A device id that could act as a regex pattern is refused.
+    await assertFails(
+      setDoc(doc(c, 'orders/o2'), newOrder('cash1', { deviceId: '.*', provisionalNumber: `OFF-x-${DK}-001` })),
+    );
+  });
+
   it('acceptance 8: an order cannot be saved as unpaid / pending', async () => {
     await assertFails(setDoc(doc(cashier(), 'orders/o2'), newOrder('cash1', { paymentStatus: 'unpaid' })));
     await assertFails(setDoc(doc(cashier(), 'orders/o2'), newOrder('cash1', { paymentMethod: 'card' })));

@@ -32,7 +32,7 @@ export function ProductCard({ product, qty, onTap }: ProductCardProps) {
           : 'active:scale-[0.98] hover:shadow-md transition')
       }
     >
-      <div className="relative aspect-[4/3] bg-stone-100">
+      <div className="relative aspect-[3/2] sm:aspect-[4/3] bg-stone-100">
         <img
           src={imgSrc}
           alt={product.name}
@@ -52,11 +52,11 @@ export function ProductCard({ product, qty, onTap }: ProductCardProps) {
           </span>
         )}
       </div>
-      <div className="p-3 flex-1 flex flex-col justify-between">
+      <div className="p-2.5 sm:p-3 flex-1 flex flex-col justify-between">
         <div className="font-bold text-stone-900 leading-tight text-base sm:text-lg">
           {product.name}
         </div>
-        <div className="mt-1 text-tandoori-700 font-extrabold text-xl">
+        <div className="mt-0.5 sm:mt-1 text-tandoori-700 font-extrabold text-lg sm:text-xl">
           {formatINR(product.pricePaise)}
         </div>
       </div>

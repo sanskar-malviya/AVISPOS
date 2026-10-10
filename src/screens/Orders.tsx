@@ -239,23 +239,27 @@ export function Orders() {
                       <div className="min-w-0 flex-1">
                         <div className="font-bold truncate">{o.orderNumber}</div>
                         <div className="text-xs text-stone-500 truncate">
+                          <span className="sm:hidden">{paymentLabel(o.paymentMethod)} · </span>
                           {from !== to && `${formatDateKey(o.dateKey)} · `}
                           {formatTime(orderTime(o))} ·{' '}
                           {o.items.map((i) => `${i.name} ×${i.qty}`).join(', ')}
                         </div>
                       </div>
-                      <span className="text-sm font-semibold text-stone-600 w-12 text-center">
+                      <span className="hidden sm:block text-sm font-semibold text-stone-600 w-12 text-center">
                         {paymentLabel(o.paymentMethod)}
                       </span>
-                      <StatusBadge order={o} pending={pendingIds.has(o.id)} />
-                      <span
-                        className={
-                          'w-20 text-right font-extrabold tabular-nums ' +
-                          (o.status !== 'completed' ? 'line-through text-stone-400' : '')
-                        }
-                      >
-                        {formatINR(o.grandTotalPaise)}
-                      </span>
+                      {/* Phones: amount above the status badge to save width. */}
+                      <div className="flex flex-col-reverse sm:flex-row items-end sm:items-center gap-1 sm:gap-3 shrink-0">
+                        <StatusBadge order={o} pending={pendingIds.has(o.id)} />
+                        <span
+                          className={
+                            'sm:w-20 text-right font-extrabold tabular-nums ' +
+                            (o.status !== 'completed' ? 'line-through text-stone-400' : '')
+                          }
+                        >
+                          {formatINR(o.grandTotalPaise)}
+                        </span>
+                      </div>
                     </button>
                   </li>
                 ))}

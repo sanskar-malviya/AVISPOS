@@ -23,7 +23,8 @@ The receipt prints by itself, then the screen returns to a new order. Tap **New 
 | You see | Do this |
 |---|---|
 | **Printing failed** (red) | The sale is already saved. Check the printer is on and has paper, then tap **Retry Print**. Retrying never charges or records the order twice. |
-| Orange **Offline** bar at the top | Keep billing as normal. Orders are saved on the tablet and go to the cloud by themselves when the internet is back. Don't re-enter them. |
+| Orange **Offline** or **Slow internet** bar at the top | Keep billing as normal. Orders are saved on the tablet and go to the cloud by themselves when the internet is back. Don't re-enter them. The receipt shows a temporary number (`OFF-…`); it still finds the order later. Closing or refreshing the app does not lose them. |
+| **"Sales not uploaded yet"** when signing out | Tap **Stay signed in** and wait for the internet. Saved sales upload only for the account that made them, so don't sign out, clear the browser's data or uninstall the app until they have gone up. |
 | Wrong item added | Tap **−** or **✕** next to it before payment. |
 | Customer changes their mind before paying | **Clear Order** → confirm. |
 | Need to go back from the payment screen | Tap **← Back to Order**. The items stay. |

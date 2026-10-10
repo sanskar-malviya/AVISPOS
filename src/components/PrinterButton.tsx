@@ -42,13 +42,15 @@ export function PrinterButton() {
         }
       }}
       className={
-        'text-sm font-semibold px-3 py-1.5 rounded-lg flex items-center gap-1.5 ' +
+        'text-sm font-semibold px-2.5 sm:px-3 py-1.5 rounded-lg flex items-center gap-1.5 whitespace-nowrap ' +
         (ok ? 'bg-white/10' : 'bg-amber-400 text-amber-950 hover:bg-amber-300')
       }
-      title={settings.printer.deviceName ? `Paired: ${settings.printer.deviceName}` : undefined}
+      aria-label={LABEL[status]}
+      title={settings.printer.deviceName ? `Paired: ${settings.printer.deviceName}` : LABEL[status]}
     >
       <span aria-hidden>🖨</span>
-      {LABEL[status]}
+      {/* On phones the colour alone says it: amber = tap to connect. */}
+      <span className="hidden lg:inline">{LABEL[status]}</span>
     </button>
   );
 }

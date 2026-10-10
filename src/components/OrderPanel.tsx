@@ -10,6 +10,8 @@ interface OrderPanelProps {
   onRemove: (productId: string) => void;
   onClear: () => void;
   onContinue: () => void;
+  /** Shown as a "Hide" button when the panel is a pop-up sheet (phones). */
+  onClose?: () => void;
 }
 
 export function OrderPanel({
@@ -20,21 +22,32 @@ export function OrderPanel({
   onRemove,
   onClear,
   onContinue,
+  onClose,
 }: OrderPanelProps) {
   const empty = lines.length === 0;
 
   return (
     <aside className="h-full flex flex-col bg-white border-l border-stone-200">
-      <div className="shrink-0 flex items-center justify-between px-4 py-3 border-b border-stone-200">
+      <div className="shrink-0 flex items-center justify-between gap-2 px-4 py-3 border-b border-stone-200">
         <h2 className="text-lg font-extrabold text-stone-900">Current Order</h2>
-        {!empty && (
-          <button
-            onClick={onClear}
-            className="text-sm font-semibold text-red-700 px-3 py-1.5 rounded-lg hover:bg-red-50"
-          >
-            Clear Order
-          </button>
-        )}
+        <div className="flex items-center gap-1">
+          {!empty && (
+            <button
+              onClick={onClear}
+              className="text-sm font-semibold text-red-700 px-3 py-1.5 rounded-lg hover:bg-red-50"
+            >
+              Clear Order
+            </button>
+          )}
+          {onClose && (
+            <button
+              onClick={onClose}
+              className="text-sm font-semibold text-stone-600 px-3 py-1.5 rounded-lg bg-stone-100"
+            >
+              Hide ▾
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Line items */}
@@ -44,7 +57,7 @@ export function OrderPanel({
             <div>
               <div className="text-5xl mb-3">🛒</div>
               <p className="font-semibold">No items yet</p>
-              <p className="text-sm">Tap a dish on the left to start the order.</p>
+              <p className="text-sm">Tap a dish to start the order.</p>
             </div>
           </div>
         ) : (
@@ -85,7 +98,7 @@ export function OrderPanel({
       </div>
 
       {/* Total + continue */}
-      <div className="shrink-0 border-t border-stone-200 p-4 space-y-3">
+      <div className="shrink-0 border-t border-stone-200 p-4 pb-[max(1rem,env(safe-area-inset-bottom))] space-y-3">
         <div className="flex items-baseline justify-between">
           <span className="text-lg font-semibold text-stone-600">Total</span>
           <span className="text-3xl font-extrabold text-stone-900 tabular-nums">
