@@ -1,7 +1,6 @@
-// Staff account management. Creating users and changing roles needs the Admin
-// SDK, so these call owner-only Cloud Functions (never done in the browser).
-import { httpsCallable } from 'firebase/functions';
-import { functions } from '../lib/firebase';
+// Staff account management. Creating users and changing roles needs the
+// Firebase Admin SDK, so these call the owner-only `staff` server function.
+import { callFunction } from './api';
 import type { Role } from '../lib/types';
 
 export interface StaffMember {
@@ -12,26 +11,23 @@ export interface StaffMember {
 }
 
 export async function listStaff(): Promise<StaffMember[]> {
-  const res = await httpsCallable<void, { staff: StaffMember[] }>(functions, 'listStaff')();
-  return res.data.staff;
+  const res = await callFunction<{ staff: StaffMember[] }>('staff', { body: { action: 'list' } });
+  return res.staff;
 }
 
 export async function createStaffUser(email: string, password: string, role: Role): Promise<void> {
-  await httpsCallable(functions, 'createStaffUser')({ email, password, role });
+  await callFunction('staff', { body: { action: 'create', email, password, role } });
 }
 
 export async function setStaffRole(uid: string, role: Role): Promise<void> {
-  await httpsCallable(functions, 'setStaffRole')({ uid, role });
+  await callFunction('staff', { body: { action: 'setRole', uid, role } });
 }
 
 export async function setStaffDisabled(uid: string, disabled: boolean): Promise<void> {
-  await httpsCallable(functions, 'setStaffDisabled')({ uid, disabled });
+  await callFunction('staff', { body: { action: 'setDisabled', uid, disabled } });
 }
 
-/** Turn a Firebase Functions error into a short message for the owner. */
+/** Short message for the owner. */
 export function staffErrorMessage(e: unknown): string {
-  const err = e as { code?: string; message?: string };
-  if (err.code === 'functions/unavailable' || err.code === 'functions/internal')
-    return 'The server could not be reached. Staff accounts can only be managed while online.';
-  return err.message || 'Something went wrong.';
+  return e instanceof Error && e.message ? e.message : 'Something went wrong.';
 }

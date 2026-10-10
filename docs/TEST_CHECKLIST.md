@@ -3,9 +3,9 @@
 Testing happens on two levels:
 
 1. **Automated**, on any computer. These ran and passed on 10 Oct 2026:
-   - `npm test`: 31 unit tests (cart, money, defaults, receipt layout, ESC/POS, reports/CSV, server validation)
-   - `npm run test:rules`: 21 Firestore security-rules tests
-   - `npm run test:e2e`: 41 checks driving the real app in a browser against the Firebase emulators,
+   - `npm test`: 33 unit tests (cart, money, defaults, receipt layout, ESC/POS, reports/CSV, server validation, backup format)
+   - `npm run test:rules`: 30 Firestore security-rules tests (incl. audit-log enforcement)
+   - `npm run test:e2e`: 43 checks driving the real app in a browser against the Firebase emulators,
      tablet-sized landscape window with touch
 2. **On the real tablet and printer.** These must be done by hand before going live, because hardware can't
    be automated. Tick each box.

@@ -3,72 +3,54 @@
 ## What protects your data already
 
 - **Sales can't be deleted** from the app, by anyone (enforced by the security rules). Cancellations and
-  refunds are status changes with a reason, and every one is recorded in the **audit log**, along with every
-  price change and every staff role change. The audit log is written only by the server.
-- **Offline protection:** orders made without internet are stored on the tablet (IndexedDB) and sync when
-  the connection returns. Don't clear Chrome's site data or uninstall the app while the Offline bar is
+  refunds are status changes with a reason.
+- **Audit log:** every price change, cancellation, refund and staff-role change is recorded. The security
+  rules refuse a price change or cancellation that doesn't come with its audit entry. Nobody can edit or
+  delete the log.
+- **Offline protection:** orders made without internet are stored on the tablet and sync when the
+  connection returns. Don't clear Chrome's site data or uninstall the app while the orange Offline bar is
   showing, or unsynced orders on that device would be lost.
-- **Firestore** keeps data replicated across multiple Google data centres.
+- **Firestore** keeps data replicated across several Google data centres.
 
-## Recommended backups
+## Automatic nightly backups
 
-### 1. Daily automatic database backups (recommended)
+Every night at **00:15 India time**, the `backup-daily` server function saves the business day that just
+ended to Netlify Blobs: that day's orders, audit entries and order counter, plus a copy of the menu and
+business settings. The owner PIN is never included. Each file is about 0.5 MB, and backups are kept
+indefinitely.
 
-Run once from [Google Cloud Shell](https://shell.cloud.google.com) (replace `PROJECT_ID`):
+**To download one:** *Settings → PIN, staff & backups → Backups* → **⬇ Download** next to the date. Keep
+your own copy somewhere else too (Google Drive, email to yourself), e.g. once a week.
 
-```bash
-gcloud config set project PROJECT_ID
-gcloud firestore backups schedules create \
-  --database='(default)' --recurrence=daily --retention=14w
-```
+**Back up right now** (e.g. before closing early or changing many prices): tap **Back up today now** in
+the same place.
 
-This keeps 14 weeks of daily backups, at a few rupees per month for this data size. To list them:
+## CSV export (for your accounts)
 
-```bash
-gcloud firestore backups list --format="table(name, snapshotTime, state)"
-```
-
-### 2. Point-in-time recovery (optional)
-
-Lets you read or restore the database as it was at any minute in the last 7 days:
-
-```bash
-gcloud firestore databases update --database='(default)' --enable-pitr
-```
-
-### 3. Weekly CSV export (simple, owner-friendly)
-
-Every week (or month): **Orders →** set *From / To* → **Export CSV**. Save the file to Google Drive or email
-it to yourself. This is also your record for accounts and tax.
-
-### 4. Product photos
-
-Photos are in Cloud Storage under `products/`. Keep your original photos on your phone or Drive. Re-uploading
-from *Settings → Products* is the simplest recovery.
+*Orders →* set **From / To → Export CSV** gives a spreadsheet of sales, Cash vs UPI, and quantity per
+product. Keep it monthly for your accounts. It's a report, not a restorable backup.
 
 ## Recovery procedures
 
-**A device was lost, broken or reset.** Nothing is lost except orders that were made offline and never synced.
+**A tablet was lost, broken or reset.** Nothing is lost except orders made offline that never synced.
 Install the app on the new tablet, sign in, and reconnect the printer.
 
-**Someone made wrong changes (prices, products, settings).** Fix them in *Settings*. The audit log
-(Firebase console → Firestore → `audit` collection) shows what changed, when and by whom.
+**Wrong changes were made (prices, products, settings).** Fix them in *Settings*. The audit log (Firebase
+console → Firestore → `audit` collection) shows what changed, when, and by whom.
 
-**Data was damaged or needs restoring.** Restore a backup into a **new** database, check it, then switch over:
+**Data was damaged or deleted outside the app.** Restore from the downloaded backup files, using a
+computer with this project and the admin key file ([DEPLOY.md](DEPLOY.md) step 1.4):
 
-```bash
-# 1. Find the backup to use
-gcloud firestore backups list
-# 2. Restore it into a new database
-gcloud firestore databases restore \
-  --source-backup=projects/PROJECT_ID/locations/asia-south1/backups/BACKUP_ID \
-  --destination-database=restored
+```powershell
+$env:GOOGLE_APPLICATION_CREDENTIALS="C:\keys\avis-pos-admin.json"
+# Restore the orders, audit entries and counters of the days you need:
+npm run restore-backup -- day-20261010.json day-20261011.json
+# Also restore the menu and settings (from the last file given):
+npm run restore-backup -- day-20261011.json --with-menu
 ```
 
-Inspect `restored` in the Firebase console. To bring the data back into the live `(default)` database,
-export from `restored` with `gcloud firestore export` and import into `(default)` with
-`gcloud firestore import`. Do this outside opening hours, and have a developer help if you are not
-comfortable with it.
+The restore rewrites the documents saved in those files and never deletes anything else. Do it outside
+opening hours. Ask a developer to help if you're not comfortable with the terminal.
 
-**Lost owner access.** Run `npm run bootstrap-owner -- your@email "new-password"` with a service-account key
-([DEPLOY.md](DEPLOY.md) step 4). It resets the password and restores the owner role.
+**Lost owner access.** Run `npm run bootstrap-owner -- your@email "new-password"` with the admin key
+([DEPLOY.md](DEPLOY.md) step 3). It resets the password and restores the owner role.

@@ -46,7 +46,8 @@ export interface Order {
   cashierUid: string;
   deviceId: string;
   reprintCount: number;
-  validated: boolean; // set true by the server-side validation function
+  checked: boolean; // false until the server has checked the order
+  validated: boolean; // true when the server found no problems
   validationErrors: string[]; // problems found by the server (empty when OK)
   provisionalNumber: string; // original offline number after reconciliation ('' if none)
   source: OrderSource;

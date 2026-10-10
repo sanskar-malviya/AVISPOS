@@ -3,7 +3,7 @@
 //
 //   npm run seed               (real project — needs GOOGLE_APPLICATION_CREDENTIALS)
 //   npm run seed -- --emulator (local emulators)
-import { getFirestore } from 'firebase-admin/firestore';
+import { FieldValue, getFirestore } from 'firebase-admin/firestore';
 import { DEFAULT_PRODUCTS } from '../src/lib/defaultProducts';
 import { initAdmin } from './admin';
 
@@ -21,8 +21,10 @@ async function main() {
   if (products.empty) {
     const batch = db.batch();
     const now = Date.now();
-    DEFAULT_PRODUCTS.forEach((p, i) =>
-      batch.set(db.collection('products').doc(slug(p.name)), {
+    DEFAULT_PRODUCTS.forEach((p, i) => {
+      const id = slug(p.name);
+      const auditId = `price-${id}-${now}`;
+      batch.set(db.collection('products').doc(id), {
         name: p.name,
         pricePaise: p.pricePaise,
         imageUrl: p.image,
@@ -33,8 +35,19 @@ async function main() {
         createdAt: now,
         updatedAt: now,
         updatedBy: 'seed-script',
-      }),
-    );
+        lastPriceAuditId: auditId,
+      });
+      // Starting price recorded in the price history, like any other change.
+      batch.set(db.collection('audit').doc(auditId), {
+        type: 'price_change',
+        productId: id,
+        productName: p.name,
+        beforePaise: null,
+        afterPaise: p.pricePaise,
+        who: 'seed-script',
+        at: FieldValue.serverTimestamp(),
+      });
+    });
     await batch.commit();
     console.log(`✔ Added ${DEFAULT_PRODUCTS.length} default products:`);
     for (const p of DEFAULT_PRODUCTS) console.log(`   ${p.name.padEnd(15)} ₹${p.pricePaise / 100}`);

@@ -11,6 +11,9 @@ import {
   staffErrorMessage,
   type StaffMember,
 } from '../../data/staff';
+import { backupNow, downloadBackup, listBackups, type BackupEntry } from '../../data/backups';
+import { dateKey } from '../../lib/ids';
+import { formatDateKey } from '../../lib/format';
 import type { Role } from '../../lib/types';
 
 function PinSection({ pinHash, onPinChanged }: { pinHash: string; onPinChanged: (h: string) => void }) {
@@ -253,6 +256,94 @@ function StaffSection() {
   );
 }
 
+function BackupsSection() {
+  const toast = useToast();
+  const [backups, setBackups] = useState<BackupEntry[] | null>(null);
+  const [error, setError] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [showAll, setShowAll] = useState(false);
+
+  const load = useCallback(async () => {
+    setError('');
+    try {
+      setBackups(await listBackups());
+    } catch (e) {
+      setError(staffErrorMessage(e));
+    }
+  }, []);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  const shown = backups && !showAll ? backups.slice(0, 7) : backups;
+
+  return (
+    <div className="card p-5">
+      <h2 className="text-lg font-extrabold">Backups</h2>
+      <p className="text-sm text-stone-500 mt-1">
+        Every night the server saves a backup of the day's orders, menu and settings. Download a
+        file to keep your own copy (e.g. on Google Drive). See docs/BACKUP.md for restoring.
+      </p>
+      <div className="mt-3">
+        <button
+          className="btn-secondary"
+          disabled={busy}
+          onClick={async () => {
+            setBusy(true);
+            try {
+              const r = await backupNow(dateKey());
+              toast.success(`Backed up today (${r.orders} orders)`);
+              await load();
+            } catch (e) {
+              toast.error(staffErrorMessage(e));
+            } finally {
+              setBusy(false);
+            }
+          }}
+        >
+          {busy ? 'Backing up…' : 'Back up today now'}
+        </button>
+      </div>
+      {error ? (
+        <p className="mt-3 text-sm text-red-700 font-semibold">
+          {error}{' '}
+          <button className="underline" onClick={() => void load()}>
+            Retry
+          </button>
+        </p>
+      ) : backups === null ? (
+        <p className="mt-3 text-stone-400">Loading…</p>
+      ) : backups.length === 0 ? (
+        <p className="mt-3 text-sm text-stone-500">No backups yet — the first one runs tonight.</p>
+      ) : (
+        <>
+          <ul className="mt-3 divide-y divide-stone-100">
+            {shown!.map((b) => (
+              <li key={b.key} className="py-2 flex items-center justify-between">
+                <span className="font-semibold">{formatDateKey(b.dateKey)}</span>
+                <button
+                  className="btn-ghost min-h-0 py-2"
+                  onClick={() =>
+                    downloadBackup(b.key).catch((e) => toast.error(staffErrorMessage(e)))
+                  }
+                >
+                  ⬇ Download
+                </button>
+              </li>
+            ))}
+          </ul>
+          {backups.length > 7 && (
+            <button className="text-sm font-semibold text-tandoori-700 mt-2" onClick={() => setShowAll((s) => !s)}>
+              {showAll ? 'Show fewer' : `Show all ${backups.length}`}
+            </button>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
 export function SecurityTab({
   pinHash,
   onPinChanged,
@@ -262,9 +353,10 @@ export function SecurityTab({
 }) {
   return (
     <div className="max-w-4xl space-y-5">
-      <h1 className="text-xl font-extrabold">PIN &amp; staff</h1>
+      <h1 className="text-xl font-extrabold">PIN, staff &amp; backups</h1>
       <PinSection pinHash={pinHash} onPinChanged={onPinChanged} />
       <StaffSection />
+      <BackupsSection />
     </div>
   );
 }

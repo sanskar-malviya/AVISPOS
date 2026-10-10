@@ -26,6 +26,7 @@ function order(
     cashierUid: 'c',
     deviceId: 'd',
     reprintCount: 0,
+    checked: true,
     validated: true,
     validationErrors: [],
     provisionalNumber: '',

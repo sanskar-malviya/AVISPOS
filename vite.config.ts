@@ -28,26 +28,13 @@ export default defineConfig({
         // App shell is precached. Firestore data persistence is handled by the
         // Firestore SDK's own IndexedDB cache, NOT Workbox — so we do not try to
         // cache Firestore/Google API calls here.
-        navigateFallbackDenylist: [/^\/__/, /\/[^/?]+\.[^/]+$/],
         globPatterns: ['**/*.{js,css,html,svg,png,jpg,ico,woff2}'],
         // Install-time icons don't need to be in the offline cache.
         globIgnores: ['pwa-512.png', 'pwa-maskable-512.png'],
-        // Owner-uploaded product photos live in Cloud Storage. Cache them so the
-        // menu still shows pictures during an internet outage. Each upload gets
-        // a new URL, so a replaced photo is never served stale.
-        runtimeCaching: [
-          {
-            urlPattern: ({ url }) =>
-              url.hostname === 'firebasestorage.googleapis.com' ||
-              url.hostname.endsWith('.firebasestorage.app'),
-            handler: 'CacheFirst',
-            options: {
-              cacheName: 'product-photos',
-              expiration: { maxEntries: 200, maxAgeSeconds: 60 * 60 * 24 * 90 },
-              cacheableResponse: { statuses: [0, 200] },
-            },
-          },
-        ],
+        // Owner-uploaded photos are stored inside the product documents, so the
+        // Firestore offline cache keeps them available without internet.
+        // Never let the service worker answer server-function calls.
+        navigateFallbackDenylist: [/^\/__/, /^\/\.netlify\//, /\/[^/?]+\.[^/]+$/],
       },
       devOptions: {
         enabled: false,
@@ -57,6 +44,11 @@ export default defineConfig({
   server: {
     port: 5173,
     host: true,
+    // Local dev: server functions run in scripts/dev-functions.ts (port 8888).
+    // On Netlify the same path is served by the real functions.
+    proxy: {
+      '/.netlify/functions': 'http://127.0.0.1:8888',
+    },
   },
   build: {
     sourcemap: true,

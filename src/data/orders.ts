@@ -13,9 +13,11 @@ import {
   setDoc,
   updateDoc,
   where,
+  writeBatch,
   type Timestamp,
 } from 'firebase/firestore';
 import { auth, db } from '../lib/firebase';
+import { requestServerCheck } from './serverCheck';
 import { dateKey, getDeviceId } from '../lib/ids';
 import type { Order, OrderItem, PaymentMethod } from '../lib/types';
 
@@ -89,6 +91,7 @@ function buildOrder(
     cashierUid,
     deviceId: getDeviceId(),
     reprintCount: 0,
+    checked: false,
     validated: false,
     validationErrors: [],
     provisionalNumber: '',
@@ -143,6 +146,7 @@ export async function submitOrder(
         }),
         TX_TIMEOUT_MS,
       );
+      requestServerCheck(); // verify totals on the server within seconds
       return { order, provisional: false };
     } catch (err) {
       // Permission/validation errors are real failures — surface them.
@@ -191,6 +195,7 @@ export function mapOrder(id: string, data: Record<string, unknown>): Order {
     cashierUid: String(data.cashierUid ?? ''),
     deviceId: String(data.deviceId ?? ''),
     reprintCount: Number(data.reprintCount ?? 0),
+    checked: Boolean(data.checked),
     validated: Boolean(data.validated),
     validationErrors: Array.isArray(data.validationErrors)
       ? (data.validationErrors as string[])
@@ -273,18 +278,35 @@ export function recordReprint(id: string): Promise<void> {
 }
 
 /**
- * Mark an order cancelled or refunded (owner only). Orders are never deleted;
- * the server writes an audit entry for every status change (spec §8, §11).
+ * Mark an order cancelled or refunded (owner only). Orders are never deleted.
+ * The status change and its audit entry are written in ONE batch; the security
+ * rules reject either without the other, so the audit trail can't be skipped
+ * (spec §8, §11).
  */
 export async function changeOrderStatus(
-  id: string,
+  order: Pick<Order, 'id' | 'orderNumber' | 'grandTotalPaise'>,
   status: 'cancelled' | 'refunded',
   reason: string,
 ): Promise<void> {
-  await updateDoc(doc(ordersCol, id), {
+  const uid = auth.currentUser?.uid ?? '';
+  const statusReason = reason.trim().slice(0, 200);
+  const batch = writeBatch(db);
+  batch.update(doc(ordersCol, order.id), {
     status,
-    statusReason: reason.trim().slice(0, 200),
-    statusChangedBy: auth.currentUser?.uid ?? '',
+    statusReason,
+    statusChangedBy: uid,
     statusChangedAt: serverTimestamp(),
   });
+  batch.set(doc(db, 'audit', `order-${order.id}-${status}`), {
+    type: status === 'refunded' ? 'refund' : 'order_cancel',
+    orderId: order.id,
+    orderNumber: order.orderNumber,
+    before: 'completed',
+    after: status,
+    amountPaise: order.grandTotalPaise,
+    reason: statusReason,
+    who: uid,
+    at: serverTimestamp(),
+  });
+  await batch.commit();
 }

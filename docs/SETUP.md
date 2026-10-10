@@ -4,7 +4,7 @@ Do this once, after the app is deployed ([DEPLOY.md](DEPLOY.md)) and you can sig
 
 ## 1. Set your owner PIN
 
-**Settings → PIN & staff → Owner PIN.** Choose 4–6 digits and enter them twice. From now on, Settings asks
+**Settings → PIN, staff & backups → Owner PIN.** Choose 4–6 digits and enter them twice. From now on, Settings asks
 for the PIN every time it is opened. A tablet left signed in as owner therefore can't be changed by anyone
 else. After 5 wrong attempts the PIN pad locks for 30 seconds.
 
@@ -43,7 +43,7 @@ the list, then tap **Print test receipt**. Full details and troubleshooting are 
 
 ## 5. Staff accounts
 
-**Settings → PIN & staff → Staff accounts.** Enter an email and a password (8+ characters), keep the role as
+**Settings → PIN, staff & backups → Staff accounts.** Enter an email and a password (8+ characters), keep the role as
 **Cashier**, tap **Add account**. Cashiers can bill and print, but can't see Orders or Settings.
 
 - **Disable** an account when someone leaves. They are signed out and can't sign back in.

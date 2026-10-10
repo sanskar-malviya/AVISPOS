@@ -18,15 +18,19 @@ import {
   serverTimestamp,
   setDoc,
   updateDoc,
+  writeBatch,
   type Firestore,
 } from 'firebase/firestore';
 
 let env: RulesTestEnvironment;
 
 const DK = '20261010';
-const owner = (): Firestore => env.authenticatedContext('owner1', { role: 'owner' }).firestore() as unknown as Firestore;
-const cashier = (): Firestore => env.authenticatedContext('cash1', { role: 'cashier' }).firestore() as unknown as Firestore;
-const noRole = (): Firestore => env.authenticatedContext('nobody', {}).firestore() as unknown as Firestore;
+const as = (uid: string, role?: string): Firestore =>
+  env.authenticatedContext(uid, role ? { role } : {}).firestore() as unknown as Firestore;
+const owner = () => as('owner1', 'owner');
+const owner2 = () => as('owner2', 'owner');
+const cashier = () => as('cash1', 'cashier');
+const noRole = () => as('nobody');
 const anon = (): Firestore => env.unauthenticatedContext().firestore() as unknown as Firestore;
 
 function newOrder(uid: string, over: Record<string, unknown> = {}) {
@@ -46,6 +50,7 @@ function newOrder(uid: string, over: Record<string, unknown> = {}) {
     cashierUid: uid,
     deviceId: 'dev1',
     reprintCount: 0,
+    checked: false,
     validated: false,
     validationErrors: [],
     provisionalNumber: '',
@@ -66,8 +71,70 @@ const product = (over: Record<string, unknown> = {}) => ({
   createdAt: 1,
   updatedAt: 1,
   updatedBy: 'owner1',
+  lastPriceAuditId: 'price-vada-pav-1',
   ...over,
 });
+
+let seq = 1000;
+interface PriceChange {
+  db: Firestore;
+  productId?: string;
+  newPrice: number;
+  by?: string; // updatedBy on the product
+  audit?: false | Partial<{ before: number | null; after: number; who: string; productId: string }>;
+  create?: boolean;
+}
+/** Change (or create) a product's price the way the app does: product + audit in one batch. */
+function priceBatch({ db, productId = 'vada-pav', newPrice, by = 'owner1', audit = {}, create }: PriceChange) {
+  const auditId = `price-${productId}-${++seq}`;
+  const b = writeBatch(db);
+  if (create) b.set(doc(db, 'products', productId), product({ pricePaise: newPrice, updatedBy: by, lastPriceAuditId: auditId }));
+  else b.update(doc(db, 'products', productId), { pricePaise: newPrice, updatedBy: by, lastPriceAuditId: auditId });
+  if (audit !== false) {
+    b.set(doc(db, 'audit', auditId), {
+      type: 'price_change',
+      productId: audit.productId ?? productId,
+      productName: 'Vada Pav',
+      beforePaise: 'before' in audit ? audit.before : create ? null : 3000,
+      afterPaise: audit.after ?? newPrice,
+      who: audit.who ?? by,
+      at: serverTimestamp(),
+    });
+  }
+  return b.commit();
+}
+
+interface StatusChange {
+  db: Firestore;
+  status?: 'cancelled' | 'refunded';
+  reason?: string;
+  by?: string;
+  audit?: false | Partial<{ amountPaise: number; type: string; reason: string; id: string }>;
+}
+/** Cancel/refund the way the app does: order update + audit entry in one batch. */
+function statusBatch({ db, status = 'cancelled', reason = 'Customer changed mind', by = 'owner1', audit = {} }: StatusChange) {
+  const b = writeBatch(db);
+  b.update(doc(db, 'orders/o1'), {
+    status,
+    statusReason: reason,
+    statusChangedBy: by,
+    statusChangedAt: serverTimestamp(),
+  });
+  if (audit !== false) {
+    b.set(doc(db, 'audit', audit.id ?? `order-o1-${status}`), {
+      type: audit.type ?? (status === 'refunded' ? 'refund' : 'order_cancel'),
+      orderId: 'o1',
+      orderNumber: `${DK}-0001`,
+      before: 'completed',
+      after: status,
+      amountPaise: audit.amountPaise ?? 3000,
+      reason: audit.reason ?? reason,
+      who: by,
+      at: serverTimestamp(),
+    });
+  }
+  return b.commit();
+}
 
 beforeAll(async () => {
   env = await initializeTestEnvironment({
@@ -85,6 +152,7 @@ beforeEach(async () => {
   await env.withSecurityRulesDisabled(async (ctx) => {
     const db = ctx.firestore();
     await setDoc(doc(db, 'products/vada-pav'), product());
+    await setDoc(doc(db, 'audit/price-vada-pav-1'), { type: 'price_change', productId: 'vada-pav', afterPaise: 3000 });
     await setDoc(doc(db, 'orders/o1'), { ...newOrder('cash1', { id: 'o1', orderNumber: `${DK}-0001` }), createdAt: new Date() });
     await setDoc(doc(db, `counters/${DK}`), { seq: 1, dateKey: DK });
     await setDoc(doc(db, 'settings/business'), { businessName: "AVI'S FOOD CORNER", paperWidth: '58' });
@@ -111,32 +179,77 @@ describe('access by role', () => {
     await assertSucceeds(setDoc(doc(owner(), 'settings/business'), { businessName: 'X' }, { merge: true }));
     await assertFails(setDoc(doc(owner(), 'settings/business'), { paperWidth: '100' }, { merge: true }));
   });
-
-  it('nobody can write the audit log from the app', async () => {
-    await assertFails(setDoc(doc(owner(), 'audit/x'), { type: 'fake' }));
-    await assertSucceeds(getDocs(collection(owner(), 'audit')));
-    await assertFails(getDocs(collection(cashier(), 'audit')));
-  });
 });
 
-describe('products', () => {
-  it('cashiers cannot change prices; owners can (recorded with their uid)', async () => {
-    await assertFails(updateDoc(doc(cashier(), 'products/vada-pav'), { pricePaise: 100, updatedBy: 'cash1' }));
-    await assertSucceeds(updateDoc(doc(owner(), 'products/vada-pav'), { pricePaise: 3500, updatedBy: 'owner1' }));
+describe('products and the price history', () => {
+  it('cashiers cannot change prices', async () => {
+    await assertFails(priceBatch({ db: cashier(), newPrice: 100, by: 'cash1' }));
   });
 
-  it('owner edits must carry their own uid and a valid price', async () => {
-    // A second owner who doesn't stamp their uid would leave the change
-    // attributed to owner1 in the audit log — rejected.
-    const owner2 = env.authenticatedContext('owner2', { role: 'owner' }).firestore() as unknown as Firestore;
-    await assertFails(updateDoc(doc(owner2, 'products/vada-pav'), { pricePaise: 3500 }));
-    await assertSucceeds(updateDoc(doc(owner2, 'products/vada-pav'), { pricePaise: 3500, updatedBy: 'owner2' }));
-    await assertFails(updateDoc(doc(owner(), 'products/vada-pav'), { pricePaise: -5, updatedBy: 'owner1' }));
-    await assertFails(updateDoc(doc(owner(), 'products/vada-pav'), { pricePaise: 35.5, updatedBy: 'owner1' }));
+  it('acceptance 5: an owner can change a price together with its audit entry', async () => {
+    await assertSucceeds(priceBatch({ db: owner(), newPrice: 3500 }));
+  });
+
+  it('a price change WITHOUT its audit entry is rejected', async () => {
+    await assertFails(priceBatch({ db: owner(), newPrice: 3500, audit: false }));
+    await assertFails(updateDoc(doc(owner(), 'products/vada-pav'), { pricePaise: 3500, updatedBy: 'owner1' }));
+  });
+
+  it('a false audit entry is rejected (wrong old price, new price or author)', async () => {
+    await assertFails(priceBatch({ db: owner(), newPrice: 3500, audit: { before: 9999 } }));
+    await assertFails(priceBatch({ db: owner(), newPrice: 3500, audit: { after: 4000 } }));
+    await assertFails(priceBatch({ db: owner(), newPrice: 3500, audit: { who: 'someone-else' } }));
+    await assertFails(priceBatch({ db: owner(), newPrice: 3500, audit: { productId: 'pav-bhaji' } }));
+  });
+
+  it('a new product needs its starting price recorded', async () => {
+    await assertSucceeds(priceBatch({ db: owner(), productId: 'samosa', newPrice: 2000, create: true }));
+    await assertFails(priceBatch({ db: owner(), productId: 'dosa', newPrice: 2000, create: true, audit: false }));
+  });
+
+  it('non-price edits need no audit entry, but must name the editor', async () => {
+    await assertSucceeds(updateDoc(doc(owner(), 'products/vada-pav'), { available: false, updatedBy: 'owner1' }));
+    // A second owner who doesn't stamp their own uid is rejected.
+    await assertFails(updateDoc(doc(owner2(), 'products/vada-pav'), { available: true }));
+    await assertSucceeds(updateDoc(doc(owner2(), 'products/vada-pav'), { available: true, updatedBy: 'owner2' }));
+    // …and can't repoint the price history without a price change.
+    await assertFails(
+      updateDoc(doc(owner(), 'products/vada-pav'), { lastPriceAuditId: 'price-vada-pav-9', updatedBy: 'owner1' }),
+    );
+  });
+
+  it('prices must be positive whole paise; photos are size-limited', async () => {
+    await assertFails(priceBatch({ db: owner(), newPrice: -5 }));
+    await assertFails(priceBatch({ db: owner(), newPrice: 35.5 }));
+    await assertSucceeds(
+      updateDoc(doc(owner(), 'products/vada-pav'), { imageUrl: 'data:image/jpeg;base64,' + 'A'.repeat(200_000), updatedBy: 'owner1' }),
+    );
+    await assertFails(
+      updateDoc(doc(owner(), 'products/vada-pav'), { imageUrl: 'data:image/jpeg;base64,' + 'A'.repeat(500_000), updatedBy: 'owner1' }),
+    );
   });
 
   it('products can never be deleted', async () => {
     await assertFails(deleteDoc(doc(owner(), 'products/vada-pav')));
+  });
+});
+
+describe('audit log', () => {
+  it('cannot be written on its own, edited or deleted', async () => {
+    await assertFails(setDoc(doc(owner(), 'audit/x'), { type: 'fake' }));
+    await assertFails(
+      setDoc(doc(owner(), 'audit/price-vada-pav-5'), {
+        type: 'price_change', productId: 'vada-pav', productName: 'Vada Pav',
+        beforePaise: 3000, afterPaise: 3000, who: 'owner1', at: serverTimestamp(),
+      }),
+    );
+    await assertFails(updateDoc(doc(owner(), 'audit/price-vada-pav-1'), { afterPaise: 1 }));
+    await assertFails(deleteDoc(doc(owner(), 'audit/price-vada-pav-1')));
+  });
+
+  it('is readable only by owners', async () => {
+    await assertSucceeds(getDocs(collection(owner(), 'audit')));
+    await assertFails(getDocs(collection(cashier(), 'audit')));
   });
 });
 
@@ -161,6 +274,7 @@ describe('orders', () => {
 
   it('rejects tampering with server-controlled or money fields', async () => {
     const c = cashier();
+    await assertFails(setDoc(doc(c, 'orders/o2'), newOrder('cash1', { checked: true })));
     await assertFails(setDoc(doc(c, 'orders/o2'), newOrder('cash1', { validated: true })));
     await assertFails(setDoc(doc(c, 'orders/o2'), newOrder('cash1', { reprintCount: 5 })));
     await assertFails(setDoc(doc(c, 'orders/o2'), newOrder('cash1', { grandTotalPaise: 1 })));
@@ -192,9 +306,9 @@ describe('orders', () => {
         const existing = await tx.get(orderRef);
         if (existing.exists()) return;
         const counter = await tx.get(counterRef);
-        const seq = Number(counter.data()?.seq ?? 0) + 1;
-        tx.set(counterRef, { seq, dateKey: DK });
-        tx.set(orderRef, newOrder('cash1', { orderNumber: `${DK}-${String(seq).padStart(4, '0')}` }));
+        const next = Number(counter.data()?.seq ?? 0) + 1;
+        tx.set(counterRef, { seq: next, dateKey: DK });
+        tx.set(orderRef, newOrder('cash1', { orderNumber: `${DK}-${String(next).padStart(4, '0')}` }));
       }),
     );
   });
@@ -211,17 +325,27 @@ describe('orders', () => {
     await assertFails(updateDoc(doc(cashier(), 'orders/o1'), { grandTotalPaise: 1 }));
   });
 
-  it('only owners can cancel/refund, a reason is required, and it is one-way', async () => {
-    const cancel = (reason: string, by = 'owner1') => ({
-      status: 'cancelled',
-      statusReason: reason,
-      statusChangedBy: by,
-      statusChangedAt: serverTimestamp(),
-    });
-    await assertFails(updateDoc(doc(cashier(), 'orders/o1'), cancel('mistake', 'cash1')));
-    await assertFails(updateDoc(doc(owner(), 'orders/o1'), cancel('')));
-    await assertFails(updateDoc(doc(owner(), 'orders/o1'), cancel('mistake', 'someone-else')));
-    await assertSucceeds(updateDoc(doc(owner(), 'orders/o1'), cancel('Customer changed mind')));
+  it('owners can cancel or refund together with an audit entry', async () => {
+    await assertSucceeds(statusBatch({ db: owner() }));
+  });
+
+  it('a refund is recorded as a refund', async () => {
+    await assertSucceeds(statusBatch({ db: owner(), status: 'refunded' }));
+  });
+
+  it('cancelling WITHOUT an audit entry, or with a false one, is rejected', async () => {
+    await assertFails(statusBatch({ db: owner(), audit: false }));
+    await assertFails(statusBatch({ db: owner(), audit: { amountPaise: 1 } }));
+    await assertFails(statusBatch({ db: owner(), audit: { type: 'refund' } }));
+    await assertFails(statusBatch({ db: owner(), audit: { reason: 'something else' } }));
+    await assertFails(statusBatch({ db: owner(), audit: { id: 'order-o1-other' } }));
+  });
+
+  it('cashiers cannot cancel; a reason is required; it is one-way', async () => {
+    await assertFails(statusBatch({ db: cashier(), by: 'cash1' }));
+    await assertFails(statusBatch({ db: owner(), reason: '' }));
+    await assertFails(statusBatch({ db: owner(), by: 'someone-else' }));
+    await assertSucceeds(statusBatch({ db: owner() }));
     await assertFails(updateDoc(doc(owner(), 'orders/o1'), { status: 'completed' }));
   });
 

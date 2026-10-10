@@ -27,22 +27,39 @@ On **Netlify**, the same six `VITE_FIREBASE_*` values go in *Site configuration 
 (`.env` isn't uploaded to GitHub, so Netlify never sees it). A build missing them shows an "App is not
 configured" screen listing what to add.
 
+## Server variables (Netlify only — SECRET)
+
+The server functions in `netlify/functions` use the Firebase Admin SDK. They read three values taken from
+the service-account key file. Generate them with
+`npm run netlify-admin-env -- "C:\keys\avis-pos-admin.json"` and add them on Netlify with **"Contains
+secret values"** ticked:
+
+| Variable | What it is |
+|---|---|
+| `FIREBASE_ADMIN_PROJECT_ID` | the project id (`wabot-66e7c`) |
+| `FIREBASE_ADMIN_CLIENT_EMAIL` | the service account's email |
+| `FIREBASE_ADMIN_PRIVATE_KEY` | the private key, on one line with `\n` for line breaks |
+
+Locally, `npm run dev:emu` needs none of these: the local functions server talks to the emulators.
+
 ## What is and isn't secret
 
 - **The `VITE_*` web config is not a secret.** It is compiled into the app that every browser downloads,
   in every Firebase web app. Data is protected by Firebase Authentication plus the security rules in
-  `firestore.rules` and `storage.rules`, never by hiding these values. `.env` is still git-ignored, so
-  each deployment keeps its own settings.
-- **The service-account key IS a secret.** It is the JSON file used by `npm run seed` and
-  `npm run bootstrap-owner`, and it grants full admin access to the project.
-  - Store it outside the project folder, and point to it with `GOOGLE_APPLICATION_CREDENTIALS`.
-  - Never commit, email or upload it. `.gitignore` blocks common key file names as a safety net.
-  - Delete it after the one-off setup. If it ever leaks, revoke it in *Google Cloud console → IAM →
-    Service accounts → Keys*.
-- **Cloud Functions need no secrets.** They run with Firebase's built-in server identity.
+  `firestore.rules`, never by hiding these values. `.env` is still git-ignored, so each deployment keeps
+  its own settings.
+- **The service-account key IS a secret.** That covers the downloaded JSON file and the three
+  `FIREBASE_ADMIN_*` values made from it. Together they grant full admin access to the project.
+  - Keep the JSON file outside the project folder (point to it with `GOOGLE_APPLICATION_CREDENTIALS`
+    when running the setup scripts).
+  - Never commit, email, upload or paste it into chat. `.gitignore` blocks common key file names as a
+    safety net.
+  - On Netlify it is marked secret, available only to the server functions and never to the website.
+  - If it ever leaks: *Google Cloud console → IAM → Service accounts → Keys →* delete that key, generate a
+    new one, and update the three Netlify variables.
 - **No API keys are needed for payments in version 1.** UPI is confirmed manually. If a payment gateway is
-  added later, its secret key must be stored with `firebase functions:secrets:set` and used only inside
-  Cloud Functions, never in the frontend.
+  added later, its secret key must be a secret Netlify variable used only inside a server function, never
+  in the frontend.
 
 ## Owner PIN
 

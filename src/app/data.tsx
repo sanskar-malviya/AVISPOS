@@ -7,6 +7,7 @@ import {
 } from 'react';
 import { subscribeProducts } from '../data/products';
 import { subscribeSettings, DEFAULT_SETTINGS } from '../data/settings';
+import { requestServerCheckAfterSync } from '../data/serverCheck';
 import type { BusinessSettings, Product } from '../lib/types';
 
 interface ShopDataValue {
@@ -48,9 +49,14 @@ export function ShopDataProvider({ children }: { children: ReactNode }) {
       (s) => setSettings(s),
       (e) => setError(e.message),
     );
+    // Orders sold offline are checked (and get their final number) by the
+    // server as soon as the tablet is back online — and on every app start.
+    requestServerCheckAfterSync();
+    window.addEventListener('online', requestServerCheckAfterSync);
     return () => {
       unsubProducts();
       unsubSettings();
+      window.removeEventListener('online', requestServerCheckAfterSync);
     };
   }, []);
 

@@ -73,7 +73,7 @@ export function OrderDetail() {
     }
     setSaving(true);
     try {
-      await changeOrderStatus(current.id, action, reason);
+      await changeOrderStatus(current, action, reason);
       toast.success(action === 'cancelled' ? 'Order cancelled' : 'Order marked as refunded');
       setAction(null);
       setReason('');
@@ -94,7 +94,10 @@ export function OrderDetail() {
     ['Status', current.status + (current.statusReason ? ` — ${current.statusReason}` : '')],
     ['Receipt reprints', String(current.reprintCount)],
     ['Sync', pending ? 'Waiting to sync (saved on device)' : 'Saved to cloud'],
-    ['Server check', current.validated ? 'Verified' : current.validationErrors.length ? 'Problem found' : 'Pending'],
+    [
+      'Server check',
+      !current.checked ? 'Pending' : current.validationErrors.length ? 'Problem found' : 'Verified',
+    ],
   ];
 
   return (

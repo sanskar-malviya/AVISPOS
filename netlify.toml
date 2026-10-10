@@ -1,15 +1,25 @@
-# Netlify hosts the web app (the PWA). Firebase still provides the database,
-# logins, photo storage and Cloud Functions — deploy those with
-# `npm run deploy` (see docs/DEPLOY.md).
+# Netlify hosts the web app (the PWA) and the server functions in
+# netlify/functions (staff accounts, order checking, daily backups).
+# Firebase (free Spark plan) provides the database and logins.
+# See docs/DEPLOY.md.
 #
 # Required environment variables (Netlify → Site configuration → Environment
-# variables): VITE_FIREBASE_API_KEY, VITE_FIREBASE_AUTH_DOMAIN,
-# VITE_FIREBASE_PROJECT_ID, VITE_FIREBASE_STORAGE_BUCKET,
-# VITE_FIREBASE_MESSAGING_SENDER_ID, VITE_FIREBASE_APP_ID
+# variables):
+#   App (public):    VITE_FIREBASE_API_KEY, VITE_FIREBASE_AUTH_DOMAIN,
+#                    VITE_FIREBASE_PROJECT_ID, VITE_FIREBASE_STORAGE_BUCKET,
+#                    VITE_FIREBASE_MESSAGING_SENDER_ID, VITE_FIREBASE_APP_ID
+#   Server (SECRET): FIREBASE_ADMIN_PROJECT_ID, FIREBASE_ADMIN_CLIENT_EMAIL,
+#                    FIREBASE_ADMIN_PRIVATE_KEY   (npm run netlify-admin-env)
 
 [build]
   command = "npm run build"
   publish = "dist"
+
+[functions]
+  directory = "netlify/functions"
+  node_bundler = "esbuild"
+  # Shipped as a normal dependency rather than bundled.
+  external_node_modules = ["firebase-admin"]
 
 [build.environment]
   NODE_VERSION = "22"

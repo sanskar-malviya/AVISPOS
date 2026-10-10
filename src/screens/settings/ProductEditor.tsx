@@ -1,7 +1,6 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { createProduct, updateProduct } from '../../data/products';
-import { deleteProductImage, uploadProductImage } from '../../data/images';
-import { resizeImage } from '../../lib/image';
+import { photoToDataUrl } from '../../lib/image';
 import { formatINR, paiseToRupees } from '../../lib/money';
 import { useToast } from '../../components/Toast';
 import { useOnline } from '../../app/useOnline';
@@ -54,17 +53,16 @@ export function ProductEditor({ product, nextSortOrder, onClose }: Props) {
     setSaving(true);
     try {
       const pricePaise = rupees * 100;
-      let id = product?.id;
-      if (!id) {
-        id = await createProduct({ name: trimmed, pricePaise, sortOrder: nextSortOrder });
-      } else if (trimmed !== product!.name || pricePaise !== product!.pricePaise) {
-        await updateProduct(id, { name: trimmed, pricePaise });
-      }
-      if (file) {
-        const blob = await resizeImage(file);
-        const { url, path } = await uploadProductImage(id, blob);
-        await updateProduct(id, { imageUrl: url, imagePath: path });
-        if (product?.imagePath) await deleteProductImage(product.imagePath);
+      // The photo is shrunk on the tablet and stored inside the product.
+      const imageUrl = file ? await photoToDataUrl(file) : undefined;
+      if (!product) {
+        await createProduct({ name: trimmed, pricePaise, sortOrder: nextSortOrder, imageUrl });
+      } else if (trimmed !== product.name || pricePaise !== product.pricePaise || imageUrl) {
+        await updateProduct(
+          product.id,
+          { name: trimmed, pricePaise, ...(imageUrl ? { imageUrl } : {}) },
+          product,
+        );
       }
       toast.success(product ? 'Product updated' : 'Product added');
       onClose();

@@ -1,13 +1,14 @@
 import {
-  addDoc,
   collection,
   doc,
   getDocs,
   onSnapshot,
   orderBy,
   query,
+  serverTimestamp,
   updateDoc,
   writeBatch,
+  type WriteBatch,
 } from 'firebase/firestore';
 import { auth, db } from '../lib/firebase';
 import { DEFAULT_PRODUCTS } from '../lib/defaultProducts';
@@ -15,7 +16,7 @@ import type { Product } from '../lib/types';
 
 const productsCol = collection(db, 'products');
 
-/** uid of the signed-in user — every product write records who made it (audit). */
+/** uid of the signed-in user — every product write records who made it. */
 function who(): string {
   return auth.currentUser?.uid ?? '';
 }
@@ -61,18 +62,45 @@ export async function getProductsOnce(): Promise<Product[]> {
   return snap.docs.map((d) => mapProduct(d.id, d.data()));
 }
 
+/**
+ * Every price change (including a new product's first price) is written in the
+ * same batch as an audit entry. The product records the entry's id in
+ * `lastPriceAuditId`, and the security rules reject either write without the
+ * other — so the price history can't be skipped (spec §11).
+ */
+function addPriceAudit(
+  batch: WriteBatch,
+  productId: string,
+  productName: string,
+  beforePaise: number | null,
+  afterPaise: number,
+): string {
+  const auditId = `price-${productId}-${Date.now()}`;
+  batch.set(doc(db, 'audit', auditId), {
+    type: 'price_change',
+    productId,
+    productName,
+    beforePaise,
+    afterPaise,
+    who: who(),
+    at: serverTimestamp(),
+  });
+  return auditId;
+}
+
 export interface NewProductInput {
   name: string;
   pricePaise: number;
   sortOrder: number;
+  imageUrl?: string;
 }
 
-export async function createProduct(input: NewProductInput): Promise<string> {
+function newProductData(input: NewProductInput, lastPriceAuditId: string) {
   const now = Date.now();
-  const ref = await addDoc(productsCol, {
+  return {
     name: input.name,
     pricePaise: input.pricePaise,
-    imageUrl: '',
+    imageUrl: input.imageUrl ?? '',
     imagePath: '',
     active: true,
     available: true,
@@ -80,20 +108,53 @@ export async function createProduct(input: NewProductInput): Promise<string> {
     createdAt: now,
     updatedAt: now,
     updatedBy: who(),
-  });
-  return ref.id;
+    lastPriceAuditId,
+  };
+}
+
+async function createProductAt(id: string, input: NewProductInput): Promise<void> {
+  const batch = writeBatch(db);
+  const auditId = addPriceAudit(batch, id, input.name, null, input.pricePaise);
+  batch.set(doc(productsCol, id), newProductData(input, auditId));
+  await batch.commit();
+}
+
+export async function createProduct(input: NewProductInput): Promise<string> {
+  const id = doc(productsCol).id;
+  await createProductAt(id, input);
+  return id;
 }
 
 export type ProductPatch = Partial<
-  Pick<Product, 'name' | 'pricePaise' | 'imageUrl' | 'imagePath' | 'active' | 'available' | 'sortOrder'>
+  Pick<Product, 'name' | 'pricePaise' | 'imageUrl' | 'active' | 'available' | 'sortOrder'>
 >;
 
-export async function updateProduct(id: string, patch: ProductPatch): Promise<void> {
-  await updateDoc(doc(productsCol, id), {
-    ...patch,
-    updatedAt: Date.now(),
-    updatedBy: who(),
-  });
+/**
+ * Update a product. When the patch changes the price, pass the product as it
+ * is now (`current`) so the change can be audited with the old price.
+ */
+export async function updateProduct(
+  id: string,
+  patch: ProductPatch,
+  current?: Pick<Product, 'name' | 'pricePaise'>,
+): Promise<void> {
+  const fields = { ...patch, updatedAt: Date.now(), updatedBy: who() };
+  const priceChanges = patch.pricePaise !== undefined && patch.pricePaise !== current?.pricePaise;
+  if (!priceChanges) {
+    await updateDoc(doc(productsCol, id), fields);
+    return;
+  }
+  if (!current) throw new Error('updateProduct: current product is required for a price change');
+  const batch = writeBatch(db);
+  const auditId = addPriceAudit(
+    batch,
+    id,
+    patch.name ?? current.name,
+    current.pricePaise,
+    patch.pricePaise!,
+  );
+  batch.update(doc(productsCol, id), { ...fields, lastPriceAuditId: auditId });
+  await batch.commit();
 }
 
 export function setAvailability(id: string, available: boolean): Promise<void> {
@@ -127,21 +188,12 @@ export function slugify(name: string): string {
  * empty catalogue — the Settings screen offers it when no products exist.
  */
 export async function seedDefaultProducts(): Promise<void> {
-  const batch = writeBatch(db);
-  const now = Date.now();
-  DEFAULT_PRODUCTS.forEach((p, i) => {
-    batch.set(doc(productsCol, slugify(p.name)), {
+  for (const [i, p] of DEFAULT_PRODUCTS.entries()) {
+    await createProductAt(slugify(p.name), {
       name: p.name,
       pricePaise: p.pricePaise,
-      imageUrl: p.image,
-      imagePath: '',
-      active: true,
-      available: true,
       sortOrder: i,
-      createdAt: now,
-      updatedAt: now,
-      updatedBy: who(),
+      imageUrl: p.image,
     });
-  });
-  await batch.commit();
+  }
 }

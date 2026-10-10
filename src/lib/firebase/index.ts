@@ -7,9 +7,9 @@ import {
   type Firestore,
 } from 'firebase/firestore';
 import { getAuth, connectAuthEmulator, type Auth } from 'firebase/auth';
-import { getStorage, connectStorageEmulator, type FirebaseStorage } from 'firebase/storage';
-import { getFunctions, connectFunctionsEmulator, type Functions } from 'firebase/functions';
 
+// Only Firestore and Authentication are used, so the app runs on Firebase's
+// free Spark plan. Server-side work runs as Netlify Functions (netlify/).
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
   authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
@@ -35,18 +35,12 @@ export const db: Firestore = initializeFirestore(app, {
 });
 
 export const auth: Auth = getAuth(app);
-export const storage: FirebaseStorage = getStorage(app);
-// Cloud Functions are deployed to Mumbai (asia-south1) — must match functions/src.
-export const FUNCTIONS_REGION = 'asia-south1';
-export const functions: Functions = getFunctions(app, FUNCTIONS_REGION);
 
 export const usingEmulators = import.meta.env.VITE_USE_EMULATORS === 'true';
 
 if (usingEmulators) {
   connectFirestoreEmulator(db, '127.0.0.1', 8080);
   connectAuthEmulator(auth, 'http://127.0.0.1:9099', { disableWarnings: true });
-  connectStorageEmulator(storage, '127.0.0.1', 9199);
-  connectFunctionsEmulator(functions, '127.0.0.1', 5001);
   // eslint-disable-next-line no-console
-  console.info('[Aviz POS] Using Firebase emulators on localhost');
+  console.info("[Avi's POS] Using Firebase emulators on localhost");
 }

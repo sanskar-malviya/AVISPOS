@@ -9,7 +9,7 @@
 // before running — it never touches a real Firebase project.
 import { chromium } from 'playwright-core';
 import { execSync } from 'node:child_process';
-import { mkdirSync } from 'node:fs';
+import { mkdirSync, rmSync, readFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { initializeApp } from 'firebase-admin/app';
@@ -33,6 +33,7 @@ try {
   console.error('Cannot reach the Firebase emulators. Start them first with:  npm run dev:emu');
   process.exit(1);
 }
+rmSync(join(root, '.local-backups'), { recursive: true, force: true });
 execSync('npx tsx scripts/seed.ts --emulator', { cwd: root, stdio: 'ignore' });
 execSync('npx tsx scripts/bootstrap-owner.ts owner@aviz.test Owner@12345 --emulator', { cwd: root, stdio: 'ignore' });
 
@@ -177,8 +178,11 @@ try {
       o1.items.some((i) => i.name === 'Chole Bhature' && i.unitPricePaise === 9000 && i.qty === 2 && i.lineTotalPaise === 18000) &&
       o1.grandTotalPaise === 21000,
   );
-  const validated = await waitFor(async () => (await db.doc(`orders/${o1.id}`).get()).get('validated') === true, 20000);
-  check('     Server-side validation (Cloud Function) verified the order', !!validated);
+  const validated = await waitFor(async () => {
+    const d = await db.doc(`orders/${o1.id}`).get();
+    return d.get('checked') === true && d.get('validated') === true;
+  }, 20000);
+  check('     Server checked the order within seconds (process-orders function)', !!validated);
 
   const receipt = await page.getByLabel('Receipt preview').innerText();
   check(
@@ -216,15 +220,23 @@ try {
   await shot('07-settings-products');
   await page.locator('li', { hasText: 'Vada Pav' }).getByRole('button', { name: 'Edit' }).click();
   await page.locator('form input[type=number]').fill('35');
+  // Replace the photo too (stored inside the product on the free plan).
+  await page.locator('form input[type=file]').setInputFiles(join(root, 'public/products/vada-pav.jpg'));
   await shot('08-edit-price');
   await page.getByRole('button', { name: 'Save', exact: true }).click();
   const priceSaved = await waitFor(async () => (await db.doc('products/vada-pav').get()).get('pricePaise') === 3500);
   check('     Owner can change a price (saved to cloud)', !!priceSaved);
+  const photo = String((await db.doc('products/vada-pav').get()).get('imageUrl') ?? '');
+  check(
+    '     Owner can replace a product photo (resized, stored with the product)',
+    photo.startsWith('data:image/jpeg') && photo.length < 400000,
+    `${Math.round(photo.length / 1024)} KB`,
+  );
   const priceAudit = await waitFor(async () => {
     const a = await db.collection('audit').where('type', '==', 'price_change').get();
     return a.docs.some((d) => d.get('productId') === 'vada-pav' && d.get('afterPaise') === 3500 && d.get('beforePaise') === 3000);
   });
-  check('     Price change written to the audit trail (by Cloud Function)', !!priceAudit);
+  check('     Price change recorded in the audit trail', !!priceAudit);
 
   await page.getByRole('link', { name: 'Billing' }).click();
   await card('Vada Pav').waitFor();
@@ -294,14 +306,14 @@ try {
   const synced = await waitFor(async () => {
     const list = await orders();
     const o = list.find((x) => x.provisionalNumber === offNum);
-    return o && /^\d{8}-\d{4}$/.test(o.orderNumber) && o.validated === true ? o : undefined;
+    return o && /^\d{8}-\d{4}$/.test(o.orderNumber) && o.checked === true && o.validated === true ? o : undefined;
   }, 40000, 1000);
   check('T13 After reconnect the order syncs and gets a canonical number', !!synced, synced ? `${offNum} → ${synced.orderNumber}` : 'not synced');
   await page.getByRole('button', { name: /New Order/ }).tap();
 
   // ── Owner PIN ────────────────────────────────────────────────────────────
   await page.getByRole('link', { name: 'Settings' }).click();
-  await page.getByRole('button', { name: 'PIN & staff' }).click();
+  await page.getByRole('button', { name: 'PIN, staff & backups' }).click();
   const pins = page.locator('input[type=password]');
   await pins.nth(0).fill('1234');
   await pins.nth(1).fill('1234');
@@ -319,14 +331,29 @@ try {
   await page.getByRole('button', { name: 'Business & receipt' }).waitFor();
   check('     Settings protected by owner PIN (wrong PIN rejected, right PIN opens)', wrong);
 
-  // ── Staff: create a cashier via Cloud Function ───────────────────────────
-  await page.getByRole('button', { name: 'PIN & staff' }).click();
+  // ── Staff: create a cashier via the staff server function ────────────────
+  await page.getByRole('button', { name: 'PIN, staff & backups' }).click();
   await page.locator('form input[type=email]').fill('cashier@aviz.test');
   await page.locator('input[autocomplete="new-password"]').fill('Cashier@123');
   await page.getByRole('button', { name: 'Add account' }).click();
   await page.getByText('Account created for cashier@aviz.test').waitFor({ timeout: 20000 });
   check('     Owner can create a cashier account', true);
-  await shot('14-staff');
+
+  // ── Backups ──────────────────────────────────────────────────────────────
+  await page.getByRole('button', { name: 'Back up today now' }).click();
+  await page.getByText(/Backed up today \(\d+ orders\)/).waitFor({ timeout: 20000 });
+  const dl = page.waitForEvent('download', { timeout: 15000 });
+  await page.getByRole('button', { name: /Download/ }).first().click();
+  const download = await dl;
+  const backupPath = join(SHOTS, 'backup.json');
+  await download.saveAs(backupPath);
+  const backup = JSON.parse(readFileSync(backupPath, 'utf8'));
+  check(
+    '     Owner can back up today and download the file (all of today\'s orders + menu)',
+    backup.format === 'avis-pos-backup' && backup.orders.length === (await orders()).length && backup.products.length === 5,
+    `${backup.orders.length} orders, ${backup.audit.length} audit entries`,
+  );
+  await shot('14-staff-backups');
 
   // ── Cashier role ─────────────────────────────────────────────────────────
   await page.getByRole('button', { name: 'Sign out' }).click();
@@ -360,8 +387,11 @@ try {
   check('E2E run completed without an unexpected error', false, String(e).split('\n')[0]);
   await shot('99-error').catch(() => {});
 } finally {
-  await browser.close();
   const failed = results.filter((r) => !r.ok);
   console.log(`\n${results.length - failed.length}/${results.length} checks passed`);
+  // Closing can reject navigations still in flight (e.g. auto-return timers);
+  // that's harmless at this point, so don't let it mask the result.
+  process.on('unhandledRejection', () => {});
+  await browser.close().catch(() => {});
   process.exit(failed.length ? 1 : 0);
 }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { formatOrderNumber, validateOrder } from '../functions/src/validate';
+import { formatOrderNumber, validateOrder } from '../shared/validate';
 
 const menu = new Map([
   ['chole-bhature', 9000],

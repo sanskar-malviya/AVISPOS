@@ -22,6 +22,7 @@ export function sampleOrder(): Order {
     cashierUid: '',
     deviceId: '',
     reprintCount: 0,
+    checked: true,
     validated: true,
     validationErrors: [],
     provisionalNumber: '',

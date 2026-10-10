@@ -32,6 +32,10 @@ Thumbs.db
 # original design files (optimised copies live in public/)
 /WhatsApp Image*
 
+# local stand-in for Netlify Blobs (backups made during development)
+.local-backups/
+.netlify/
+
 # test artefacts
 tests/e2e/screenshots/
 

@@ -1,151 +1,118 @@
-# Deploying
+# Deploying (no payment card needed)
 
-The POS is deployed in two parts:
+The POS runs entirely on **free plans**:
 
-| Part | Where | Contains | How it updates |
+| Part | Service (free plan) | Contains | How it updates |
 |---|---|---|---|
-| **Website** (the app the tablet opens) | **Netlify** | the built PWA (`dist/`) | Automatically on every push to GitHub |
-| **Backend** | **Firebase** | database + security rules, logins, photo storage, Cloud Functions | `npm run deploy` (only when rules or functions change) |
+| **Website + server functions** | **Netlify** | the app the tablet opens, plus small server functions for staff accounts, order checking and nightly backups (`netlify/functions`) | Automatically on every push to GitHub |
+| **Database + logins** | **Firebase Spark** | Firestore database, security rules, Authentication | Rules: re-publish only when `firestore.rules` changes |
 
-The first time takes about 45 minutes. You need a Google account and a payment card for Firebase's Blaze
-plan; at a single stall's volume the expected bill is about ₹0 ([COSTS.md](COSTS.md)). You also need a free
-Netlify account.
+First-time setup takes about 45 minutes. You need a Google account and a Netlify account, and the
+`sanskar-malviya` GitHub login to connect the repository.
 
-## 0. Before you start
+## 1. Firebase (database and logins)
 
-- **Use a Firebase project dedicated to the POS.** Deploying replaces the project's *entire* Firestore and
-  Storage security rules, which would break any other app using that project. This POS uses
-  `wabot-66e7c`, confirmed as dedicated.
-- Install on the computer you deploy from:
-  - Node.js 22 LTS — <https://nodejs.org>
-  - Firebase CLI — `npm install -g firebase-tools`
-  - Java 21 (only needed for the local emulators/tests) — <https://adoptium.net>
+Open the [Firebase console](https://console.firebase.google.com) and select project **wabot-66e7c**. Stay
+on the free **Spark** plan; nothing here needs a card.
 
-## 1. Set up the Firebase project (one time)
+1. **Email login:** *Build → Authentication → Get started → Sign-in method → Email/Password →* switch on
+   the first toggle *→ Save*.
+2. **Database:** *Build → Firestore Database → Create database →* location **`asia-south1 (Mumbai)`** *→
+   Next → Start in production mode → Create.* The location can't be changed later.
+3. **Security rules:** *Firestore Database → **Rules** tab*. Delete everything there, paste the full contents
+   of [`firestore.rules`](../firestore.rules) from this project, and click **Publish**.
+   (Developers can run `firebase login` then `npm run deploy:rules` instead.)
+4. **Admin key** for the server functions and setup scripts: *⚙ Project settings → Service accounts →
+   Generate new private key → Generate key.* A `.json` file downloads. Move it to a folder **outside** the
+   POS folder, e.g. `C:\keys\avis-pos-admin.json`. **It is a master key: never share it, email it, or put
+   it in the project or on GitHub.**
+5. **Web config:** *⚙ Project settings → General → Your apps.* If no web app (`</>`) exists, add one. Keep
+   the six config values handy for Netlify (step 2.3).
 
-In the [Firebase console](https://console.firebase.google.com):
+## 2. Netlify (website and server functions)
 
-1. **Create the project** (Google Analytics is not needed), or open the existing one.
-2. **Upgrade to Blaze:** bottom-left, click *Spark → Upgrade*. Then in Google Cloud Billing set a
-   **budget alert** (e.g. ₹500/month) so you are emailed long before any real spend.
-3. **Authentication → Get started → Sign-in method → Email/Password → Enable.**
-4. **Firestore Database → Create database → Production mode → Location `asia-south1 (Mumbai)`.**
-   The location can't be changed later. If the database is in a different region, change `asia-south1`
-   in `functions/src/index.ts` **and** `src/lib/firebase/index.ts` to match.
-5. **Storage → Get started** (production mode).
-6. **Project settings → General → Your apps → Web (`</>`)** → register an app and copy the six config
-   values. You'll need them for `.env` (step 2) and for Netlify (step 4).
+### 2.1 Connect the repository
+1. Go to <https://app.netlify.com/signup> → **Sign up with GitHub**, using the **sanskar-malviya**
+   account. The repository owner must grant Netlify access.
+2. **Add new site → Import an existing project → GitHub →** authorise →
+   (if the repo isn't listed: *Configure the Netlify app on GitHub → Only select repositories →
+   AVISPOS → Save*) → choose **AVISPOS**.
+3. The build settings fill themselves in from `netlify.toml`: branch `main`, build command
+   `npm run build`, publish directory `dist`, functions `netlify/functions`. Leave them as they are.
 
-## 2. Configure this code
+### 2.2 Generate the three server settings from the admin key
+In VS Code's terminal (inside the POS folder):
 
-```bash
-copy .env.example .env        # macOS/Linux: cp .env.example .env
+```powershell
+npm run netlify-admin-env -- "C:\keys\avis-pos-admin.json"
 ```
 
-Fill `.env` with the six values ([ENV.md](ENV.md) explains each one). Then:
+It prints three lines: `FIREBASE_ADMIN_PROJECT_ID=…`, `FIREBASE_ADMIN_CLIENT_EMAIL=…` and
+`FIREBASE_ADMIN_PRIVATE_KEY="…"`.
 
-```bash
-firebase login                # opens the browser; sign in with the project owner's Google account
-firebase use default          # .firebaserc already maps "default" to wabot-66e7c
-npm install
-npm --prefix functions install
-```
+### 2.3 Add the environment variables
+On the import page click **Add environment variables** (later: *Site configuration → Environment
+variables*), then **Import from a .env file**:
 
-## 3. Deploy the backend (Firebase)
+1. Paste the **six public app values**:
+   ```
+   VITE_FIREBASE_API_KEY=AIzaSyCIDS_hHmxhrsy_I0BDeT8MSQ_xxz-2T70
+   VITE_FIREBASE_AUTH_DOMAIN=wabot-66e7c.firebaseapp.com
+   VITE_FIREBASE_PROJECT_ID=wabot-66e7c
+   VITE_FIREBASE_STORAGE_BUCKET=wabot-66e7c.firebasestorage.app
+   VITE_FIREBASE_MESSAGING_SENDER_ID=567705918379
+   VITE_FIREBASE_APP_ID=1:567705918379:web:a26a71bfb44ab62c7310ee
+   ```
+2. Import again, this time pasting the **three server lines** from step 2.2, and tick
+   **"Contains secret values"**. Netlify then hides them and only gives them to the server functions.
 
-```bash
-npm run deploy
-```
+### 2.4 Deploy
+Click **Deploy**. After 1–3 minutes the status shows **Published**. If it shows **Failed**, open the deploy
+and copy the last lines of the log.
 
-This deploys the Firestore rules, Storage rules and Cloud Functions. On the first Functions deploy the CLI
-may:
+### 2.5 Name and login domain
+1. *Site configuration → Site details → Change site name →* `avis-food-corner` → the app is at
+   **https://avis-food-corner.netlify.app**.
+2. Firebase console → *Authentication → Settings → Authorized domains → Add domain →*
+   `avis-food-corner.netlify.app`.
 
-- ask to enable some Google Cloud APIs — answer **yes**;
-- ask about an **Artifact Registry cleanup policy** — answer **yes** (keeps storage costs at ~₹0).
+The two scheduled jobs start automatically: order checking every 10 minutes and the nightly backup at
+00:15 IST. You can see them under *Netlify → Logs & metrics → Functions*.
 
-> **Windows tip:** *"Cannot determine backend specification. Timeout after 10000"* means the antivirus is
-> slowing the first Functions load. `npm run deploy` already sets `FUNCTIONS_DISCOVERY_TIMEOUT=60`. If you
-> run `firebase deploy` directly, set it yourself first (PowerShell: `$env:FUNCTIONS_DISCOVERY_TIMEOUT=60`).
+## 3. Owner account and default menu
 
-## 4. Deploy the website (Netlify)
-
-**Recommended: connect the GitHub repository** so every push deploys automatically.
-
-1. Sign in at <https://app.netlify.com> → **Add new site → Import an existing project → GitHub** → choose
-   the `AVISPOS` repository. (Netlify asks for permission to read the repo the first time.)
-2. Netlify reads `netlify.toml`, so the build settings fill themselves in: build command `npm run build`,
-   publish directory `dist`, Node 22. Leave them as they are.
-3. Expand **Environment variables** (or later: *Site configuration → Environment variables*) and add the six
-   values from step 1.6, with exactly these names:
-
-   | Key | Value |
-   |---|---|
-   | `VITE_FIREBASE_API_KEY` | `AIza…` |
-   | `VITE_FIREBASE_AUTH_DOMAIN` | `wabot-66e7c.firebaseapp.com` |
-   | `VITE_FIREBASE_PROJECT_ID` | `wabot-66e7c` |
-   | `VITE_FIREBASE_STORAGE_BUCKET` | `wabot-66e7c.firebasestorage.app` |
-   | `VITE_FIREBASE_MESSAGING_SENDER_ID` | `567705918379` |
-   | `VITE_FIREBASE_APP_ID` | `1:567705918379:web:…` |
-
-4. Click **Deploy**. After about a minute the site is live at an address like `https://random-name.netlify.app`.
-5. Optional: *Site configuration → Change site name* to something like `avis-pos`, giving
-   `https://avis-pos.netlify.app`.
-6. In **Firebase console → Authentication → Settings → Authorized domains**, add your Netlify address
-   (e.g. `avis-pos.netlify.app`).
-
-If the site shows **"App is not configured"**, an environment variable is missing or misspelled. Fix it,
-then *Deploys → Trigger deploy → Deploy site*.
-
-**Without GitHub (manual upload):** after `npm run build` (which uses your local `.env`):
-
-```bash
-npx netlify-cli login
-npx netlify-cli deploy --prod --dir dist
-```
-
-> Firebase Hosting also still works if you ever prefer a single provider: `npm run deploy:firebase-hosting`.
-
-## 5. Create the owner account and default menu
-
-These one-off scripts need an **Admin service-account key**:
-
-1. Firebase console → *Project settings → Service accounts → Generate new private key*.
-2. Save the file **outside this folder** (e.g. `C:\keys\avis-pos-admin.json`). Never commit or share it.
-3. Run (PowerShell):
+In VS Code's terminal (PowerShell), with your own email and a strong password:
 
 ```powershell
 $env:GOOGLE_APPLICATION_CREDENTIALS="C:\keys\avis-pos-admin.json"
-npm run bootstrap-owner -- owner@yourmail.com "a-strong-password"
+npm run bootstrap-owner -- you@gmail.com "YourStrongPassword"
 npm run seed
 ```
 
-`seed` adds the five default products and business settings, and only fills an empty database. After this
-you can delete the key file. All further staff accounts are created from inside the app (*Settings → PIN &
-staff*).
+You should see `✔ … is now an OWNER` and the five products listed. `seed` only fills an empty database.
+Staff accounts are then created inside the app (*Settings → PIN, staff & backups*).
 
-## 6. Set up the tablet
+## 4. The tablet
 
-1. On the Android tablet, open **Chrome** at the Netlify address and sign in with the owner account.
+1. Open **Chrome** on the Android tablet at the Netlify address and sign in as the owner.
 2. Chrome menu → **Install app** (or *Add to Home screen*). It now opens full-screen in landscape.
-3. Follow [SETUP.md](SETUP.md): set an owner PIN, check products/photos, choose the printer, create a
-   cashier account.
+3. Follow [SETUP.md](SETUP.md): owner PIN, products and photos, printer, cashier account.
 4. Day to day, sign the tablet in with the **cashier** account.
-5. Optional kiosk lock: Android *Settings → Security → App pinning*, then pin the POS app.
+5. Optional kiosk lock: Android *Settings → Security → App pinning*.
 
 ## Updating later
 
-- **App changes:** push to GitHub and Netlify rebuilds and publishes automatically. Installed tablets pick
-  up the new version the next time the app is opened while online.
-- **Rules or Cloud Functions changes** (`firestore.rules`, `storage.rules`, `functions/`): also run
-  `npm run deploy`.
+- **Any change pushed to GitHub** is rebuilt and published by Netlify automatically, including the server
+  functions. Tablets pick it up the next time the app opens while online.
+- **If `firestore.rules` changed**, publish it again (step 1.3, or `npm run deploy:rules`).
 
 ## Troubleshooting
 
 | Symptom | Fix |
 |---|---|
-| "App is not configured" | Netlify environment variables missing (step 4.3), then redeploy |
-| "Page not found" when refreshing a page | `netlify.toml` missing from the repo (it provides the single-page-app redirect) |
-| "Missing or insufficient permissions" after sign-in | The account has no role. The owner should set one under *Settings → PIN & staff*. The user must then sign out and in again. |
-| Staff list says the server can't be reached | Functions not deployed, or the region doesn't match the Firestore location (step 1.4) |
-| Orders never show "Verified" in order details | Check *Firebase console → Functions → Logs* for `onOrderCreated` errors |
+| "App is not configured" | One of the six `VITE_FIREBASE_*` variables is missing → add it → *Deploys → Trigger deploy* |
+| Staff list / Backups say "The server is not configured" | The three `FIREBASE_ADMIN_*` variables are missing or mistyped (step 2.2–2.3) → redeploy |
+| "Missing or insufficient permissions" after sign-in | Rules not published (step 1.3), or the account has no role (owner sets one under *Settings → PIN, staff & backups*; the person then signs out and in) |
+| Orders stay "Pending" under *Server check* | Check *Netlify → Logs & metrics → Functions → process-orders* for errors |
+| "Page not found" when refreshing a page | `netlify.toml` is missing from the repository |
 | Bluetooth printer not found | See [PRINTER.md](PRINTER.md) |

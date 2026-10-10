@@ -28,6 +28,36 @@ export async function resizeImage(file: File, maxSize = 800, quality = 0.82): Pr
   }
 }
 
+/** Read a Blob as a data: URL. */
+export function blobToDataUrl(blob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result));
+    reader.onerror = () => reject(new Error('Could not read the image.'));
+    reader.readAsDataURL(blob);
+  });
+}
+
+/** Firestore documents are limited to 1 MiB; photos are kept well below that. */
+export const MAX_PHOTO_DATA_URL_CHARS = 400_000;
+
+/**
+ * Turn a camera/gallery photo into a compact JPEG data URL suitable for
+ * storing inside the product document (no separate file storage needed).
+ * Tries progressively smaller sizes until it fits.
+ */
+export async function photoToDataUrl(file: File): Promise<string> {
+  for (const [size, quality] of [
+    [640, 0.78],
+    [520, 0.7],
+    [420, 0.62],
+  ] as const) {
+    const url = await blobToDataUrl(await resizeImage(file, size, quality));
+    if (url.length <= MAX_PHOTO_DATA_URL_CHARS) return url;
+  }
+  throw new Error('This photo is too detailed to store. Please try a different photo.');
+}
+
 async function decode(
   file: File,
 ): Promise<{ source: CanvasImageSource; width: number; height: number; cleanup: () => void }> {

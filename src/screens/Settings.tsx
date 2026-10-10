@@ -10,7 +10,7 @@ const TABS: { id: Tab; label: string }[] = [
   { id: 'products', label: 'Products' },
   { id: 'business', label: 'Business & receipt' },
   { id: 'printer', label: 'Printer' },
-  { id: 'security', label: 'PIN & staff' },
+  { id: 'security', label: 'PIN, staff & backups' },
 ];
 
 const MAX_ATTEMPTS = 5;
@@ -163,7 +163,7 @@ export function Settings() {
         {!pinHash && tab !== 'security' && (
           <div className="mb-4 rounded-xl bg-amber-50 text-amber-900 px-4 py-3 text-sm font-semibold">
             No owner PIN is set, so anyone signed in as owner can open Settings. Set one under
-            “PIN &amp; staff”.
+            “PIN, staff &amp; backups”.
           </div>
         )}
         {tab === 'products' && <ProductsTab />}

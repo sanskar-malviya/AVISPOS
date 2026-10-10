@@ -1,11 +1,16 @@
 rules_version = '2';
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Avi's Food Corner POS — Firestore security rules
+// Avi's Food Corner POS — Firestore security rules (Firebase free Spark plan)
 //
-// Roles come from Firebase Auth custom claims set by owner-only Cloud Functions
-// (or the one-off bootstrap-owner script):  role == 'owner' | 'cashier'.
-// Cloud Functions use the Admin SDK and are not subject to these rules.
+// Roles come from Firebase Auth custom claims set by the owner-only `staff`
+// Netlify Function (or the one-off bootstrap-owner script):
+//   role == 'owner' | 'cashier'.
+// Netlify Functions use the Admin SDK and are not subject to these rules.
+//
+// Audit trail: there are no database triggers on the free plan, so the app
+// writes each audit entry in the SAME batch as the change it records, and
+// these rules refuse the change without its audit entry (and vice versa).
 // ─────────────────────────────────────────────────────────────────────────────
 service cloud.firestore {
   match /databases/{database}/documents {
@@ -15,6 +20,9 @@ service cloud.firestore {
     function isStaff()  {
       return signedIn() && request.auth.token.role in ['owner', 'cashier'];
     }
+    function docPath(collection, id) {
+      return /databases/$(database)/documents/$(collection)/$(id);
+    }
 
     // ── Products ────────────────────────────────────────────────────────────
     function validProduct(p) {
@@ -22,13 +30,37 @@ service cloud.firestore {
         && p.pricePaise is int && p.pricePaise > 0 && p.pricePaise <= 9999900
         && p.active is bool && p.available is bool
         && p.sortOrder is number
-        && p.imageUrl is string
+        // Photos are stored inline as compact JPEG data URLs (max ~400 KB).
+        && p.imageUrl is string && p.imageUrl.size() <= 400000
         && p.updatedBy == request.auth.uid;
+    }
+
+    // The product's new price is recorded by audit/{lastPriceAuditId}, written
+    // in the same batch, with the correct before/after prices and author.
+    function priceAudited(productId, beforePaise) {
+      let auditId = request.resource.data.lastPriceAuditId;
+      let entry = getAfter(docPath('audit', auditId)).data;
+      return auditId is string
+        && auditId.matches('^price-' + productId + '-[0-9]+$')
+        && entry.type == 'price_change'
+        && entry.productId == productId
+        && entry.beforePaise == beforePaise
+        && entry.afterPaise == request.resource.data.pricePaise
+        && entry.who == request.auth.uid;
     }
 
     match /products/{productId} {
       allow read: if isStaff();
-      allow create, update: if isOwner() && validProduct(request.resource.data);
+      allow create: if isOwner()
+        && validProduct(request.resource.data)
+        && priceAudited(productId, null);
+      allow update: if isOwner()
+        && validProduct(request.resource.data)
+        && ((request.resource.data.pricePaise == resource.data.pricePaise
+              && request.resource.data.get('lastPriceAuditId', '')
+                   == resource.data.get('lastPriceAuditId', ''))
+            || (request.resource.data.pricePaise != resource.data.pricePaise
+              && priceAudited(productId, resource.data.pricePaise)));
       // Never delete products: past orders reference them. Deactivate instead.
       allow delete: if false;
     }
@@ -39,7 +71,8 @@ service cloud.firestore {
           'id', 'orderNumber', 'orderNumberProvisional', 'createdAt', 'clientCreatedAt',
           'dateKey', 'items', 'subtotalPaise', 'grandTotalPaise', 'paymentMethod',
           'paymentStatus', 'status', 'cashierUid', 'deviceId', 'reprintCount',
-          'validated', 'validationErrors', 'provisionalNumber', 'source', 'statusReason'])
+          'checked', 'validated', 'validationErrors', 'provisionalNumber', 'source',
+          'statusReason'])
         && d.id == orderId
         && d.cashierUid == request.auth.uid
         && d.dateKey is string && d.dateKey.matches('^[0-9]{8}$')
@@ -59,6 +92,7 @@ service cloud.firestore {
         && d.status == 'completed'
         // Fields only the server may set.
         && d.reprintCount == 0
+        && d.checked == false
         && d.validated == false
         && d.validationErrors.size() == 0
         && d.provisionalNumber == ''
@@ -66,8 +100,8 @@ service cloud.firestore {
         && d.source in ['online', 'offline']
         && d.deviceId is string;
       // Per-line maths (qty × price, sum of lines) can't be looped over in
-      // rules; the onOrderCreated Cloud Function re-checks every line against
-      // the menu and flags any mismatch.
+      // rules; the process-orders server function re-checks every line
+      // against the menu and flags any mismatch.
     }
 
     function isReprint() {
@@ -75,16 +109,19 @@ service cloud.firestore {
         && request.resource.data.reprintCount == resource.data.reprintCount + 1;
     }
 
-    function isStatusChange() {
+    function isStatusChange(orderId) {
+      let next = request.resource.data;
       return resource.data.status == 'completed'
-        && request.resource.data.status in ['cancelled', 'refunded']
-        && request.resource.data.diff(resource.data).affectedKeys()
+        && next.status in ['cancelled', 'refunded']
+        && next.diff(resource.data).affectedKeys()
              .hasOnly(['status', 'statusReason', 'statusChangedBy', 'statusChangedAt'])
-        && request.resource.data.statusChangedBy == request.auth.uid
-        && request.resource.data.statusChangedAt == request.time
-        && request.resource.data.statusReason is string
-        && request.resource.data.statusReason.size() > 0
-        && request.resource.data.statusReason.size() <= 200;
+        && next.statusChangedBy == request.auth.uid
+        && next.statusChangedAt == request.time
+        && next.statusReason is string
+        && next.statusReason.size() > 0
+        && next.statusReason.size() <= 200
+        // Must be written together with its audit entry.
+        && existsAfter(docPath('audit', 'order-' + orderId + '-' + next.status));
     }
 
     match /orders/{orderId} {
@@ -93,7 +130,7 @@ service cloud.firestore {
       allow get: if isStaff();
       allow list: if isOwner();
       allow create: if isStaff() && validNewOrder(request.resource.data, orderId);
-      allow update: if (isStaff() && isReprint()) || (isOwner() && isStatusChange());
+      allow update: if (isStaff() && isReprint()) || (isOwner() && isStatusChange(orderId));
       // Completed sales can never be deleted from the app.
       allow delete: if false;
     }
@@ -125,13 +162,52 @@ service cloud.firestore {
       allow read, write: if isOwner();
     }
 
-    // ── Audit log — written only by Cloud Functions ─────────────────────────
-    match /audit/{entryId} {
-      allow read: if isOwner();
-      allow write: if false;
+    // ── Audit log — append-only ─────────────────────────────────────────────
+    // Price-change entry: only alongside the product write that points to it.
+    function validPriceAudit(entryId) {
+      let a = request.resource.data;
+      let product = getAfter(docPath('products', a.productId)).data;
+      return a.type == 'price_change'
+        && a.keys().hasOnly(['type', 'productId', 'productName', 'beforePaise',
+                             'afterPaise', 'who', 'at'])
+        && a.productId is string
+        && a.who == request.auth.uid
+        && a.at == request.time
+        && product.lastPriceAuditId == entryId
+        && a.afterPaise == product.pricePaise;
     }
 
-    // ── User profiles (mirror of roles; written only by Cloud Functions) ────
+    // Cancel/refund entry: only alongside the real status change it describes.
+    function validStatusAudit(entryId) {
+      let a = request.resource.data;
+      let before = get(docPath('orders', a.orderId)).data;
+      let after = getAfter(docPath('orders', a.orderId)).data;
+      return a.type in ['order_cancel', 'refund']
+        && a.keys().hasOnly(['type', 'orderId', 'orderNumber', 'before', 'after',
+                             'amountPaise', 'reason', 'who', 'at'])
+        && a.orderId is string
+        && entryId == 'order-' + a.orderId + '-' + a.after
+        && (a.type == 'refund') == (a.after == 'refunded')
+        && a.before == 'completed' && before.status == 'completed'
+        && after.status == a.after
+        && a.amountPaise == after.grandTotalPaise
+        && a.orderNumber == after.orderNumber
+        && a.reason == after.statusReason
+        && a.who == request.auth.uid
+        && a.at == request.time;
+    }
+
+    match /audit/{entryId} {
+      allow read: if isOwner();
+      allow create: if isOwner()
+        && ((request.resource.data.type == 'price_change' && validPriceAudit(entryId))
+            || (request.resource.data.type in ['order_cancel', 'refund']
+                && validStatusAudit(entryId)));
+      // Nobody can edit or remove history.
+      allow update, delete: if false;
+    }
+
+    // ── User profiles (mirror of roles; written only by the server) ─────────
     match /users/{uid} {
       allow read: if isOwner() || (signedIn() && request.auth.uid == uid);
       allow write: if false;
