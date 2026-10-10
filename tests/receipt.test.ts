@@ -15,7 +15,7 @@ const text = (s: BusinessSettings, reprint = false) =>
 describe('receipt', () => {
   it('acceptance 10: contains the business, items, quantities, totals and payment method', () => {
     const t = text(settings58);
-    expect(t).toContain('AVIZ FOOD POINT');
+    expect(t).toContain("AVI'S FOOD CORNER");
     expect(t).toContain('100% Vegetarian');
     expect(t).toContain('Order No: TEST-0001');
     expect(t).toMatch(/Chole Bhature\s+2\s+₹180/);

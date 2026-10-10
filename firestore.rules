@@ -1,7 +1,7 @@
 rules_version = '2';
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Aviz Food Point POS — Firestore security rules
+// Avi's Food Corner POS — Firestore security rules
 //
 // Roles come from Firebase Auth custom claims set by owner-only Cloud Functions
 // (or the one-off bootstrap-owner script):  role == 'owner' | 'cashier'.

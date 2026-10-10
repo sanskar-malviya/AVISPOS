@@ -88,7 +88,7 @@ export function ProductsTab() {
         <div className="card p-6 text-center">
           <p className="font-semibold">No products yet.</p>
           <p className="text-sm text-stone-500 mt-1">
-            Load the standard Aviz menu (Chole Bhature ₹90, Pav Bhaji ₹70, Veg Biryani ₹50, Chole
+            Load the standard Avi's Food Corner menu (Chole Bhature ₹90, Pav Bhaji ₹70, Veg Biryani ₹50, Chole
             Kulche ₹60, Vada Pav ₹30) or add items one by one.
           </p>
           <button

@@ -7,7 +7,7 @@ for Firebase's Blaze plan; at a single stall's volume the expected bill is about
 
 - **Use a Firebase project dedicated to the POS.** Deploying replaces the project's *entire* Firestore and
   Storage security rules. If the project is already used by another app, that app will stop working.
-  If in doubt, create a new project (e.g. `aviz-pos`).
+  If in doubt, create a new project (e.g. `avis-pos`).
 - Install on the computer you deploy from:
   - Node.js 22 LTS — <https://nodejs.org>
   - Firebase CLI — `npm install -g firebase-tools`
@@ -56,7 +56,7 @@ Functions deploy the CLI may:
 - ask to enable some Google Cloud APIs — answer **yes**;
 - ask about an **Artifact Registry cleanup policy** — answer **yes** (keeps storage costs at ~₹0).
 
-When it finishes it prints the app URL, e.g. `https://aviz-pos.web.app`.
+When it finishes it prints the app URL, e.g. `https://avis-pos.web.app`.
 
 > **Windows tip:** if you see *"Cannot determine backend specification. Timeout after 10000"*, the
 > antivirus is slowing the first Functions load. `npm run deploy` already sets
@@ -68,11 +68,11 @@ When it finishes it prints the app URL, e.g. `https://aviz-pos.web.app`.
 These one-off scripts need an **Admin service-account key**:
 
 1. Firebase console → *Project settings → Service accounts → Generate new private key*.
-2. Save the file **outside this folder** (e.g. `C:\keys\aviz-pos-admin.json`). Never commit or share it.
+2. Save the file **outside this folder** (e.g. `C:\keys\avis-pos-admin.json`). Never commit or share it.
 3. Run (PowerShell):
 
 ```powershell
-$env:GOOGLE_APPLICATION_CREDENTIALS="C:\keys\aviz-pos-admin.json"
+$env:GOOGLE_APPLICATION_CREDENTIALS="C:\keys\avis-pos-admin.json"
 npm run bootstrap-owner -- owner@yourmail.com "a-strong-password"
 npm run seed
 ```

@@ -22,7 +22,7 @@ export function initAdmin(): void {
       'GOOGLE_APPLICATION_CREDENTIALS is not set.\n' +
         'Download a service-account key (Firebase console → Project settings → Service accounts →\n' +
         'Generate new private key), save it OUTSIDE this folder, then e.g. in PowerShell:\n' +
-        '  $env:GOOGLE_APPLICATION_CREDENTIALS="C:\\keys\\aviz-pos-admin.json"\n' +
+        '  $env:GOOGLE_APPLICATION_CREDENTIALS="C:\\keys\\avis-pos-admin.json"\n' +
         'Or add --emulator to run against the local emulators.',
     );
     process.exit(1);

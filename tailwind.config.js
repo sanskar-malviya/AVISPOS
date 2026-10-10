@@ -4,7 +4,7 @@ export default {
   theme: {
     extend: {
       colors: {
-        // Aviz Food Point brand — warm, appetising, restrained.
+        // Avi's Food Corner brand — warm, appetising, restrained.
         brand: {
           50: '#fff7ed',
           100: '#ffedd5',

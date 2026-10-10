@@ -1,4 +1,4 @@
-// Shared domain types for the Aviz Food Point POS.
+// Shared domain types for the Avi's Food Corner POS.
 // NOTE: all monetary values are integer PAISE (1 rupee = 100 paise) to avoid
 // floating-point errors. Never store rupees as a float anywhere.
 

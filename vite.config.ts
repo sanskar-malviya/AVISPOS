@@ -10,9 +10,9 @@ export default defineConfig({
       registerType: 'autoUpdate',
       includeAssets: ['favicon-64.png', 'robots.txt', 'apple-touch-icon.png', 'brand/logo.jpg'],
       manifest: {
-        name: 'Aviz Food Point POS',
-        short_name: 'Aviz POS',
-        description: 'Fast billing for Aviz Food Point',
+        name: "Avi's Food Corner POS",
+        short_name: "Avi's POS",
+        description: "Fast billing for Avi's Food Corner",
         theme_color: '#b91c1c',
         background_color: '#fff7ed',
         display: 'fullscreen',

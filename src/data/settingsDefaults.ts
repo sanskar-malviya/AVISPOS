@@ -2,7 +2,7 @@ import type { BusinessSettings } from '../lib/types';
 
 /** Defaults used until the owner saves settings (and by the seed script). */
 export const DEFAULT_SETTINGS: BusinessSettings = {
-  businessName: 'AVIZ FOOD POINT',
+  businessName: "AVI'S FOOD CORNER",
   tagline: '100% Vegetarian',
   contact: '',
   receiptHeader: '',

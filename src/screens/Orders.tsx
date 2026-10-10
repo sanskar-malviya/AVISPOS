@@ -110,9 +110,9 @@ export function Orders() {
   }
 
   function exportCsv() {
-    const csv = ordersToCsv(orders, `Aviz Food Point sales report — ${rangeLabel}`);
+    const csv = ordersToCsv(orders, `Avi's Food Corner sales report — ${rangeLabel}`);
     const [a, b] = from <= to ? [from, to] : [to, from];
-    downloadCsv(`aviz-sales-${a}${a === b ? '' : '-' + b}.csv`, csv);
+    downloadCsv(`avis-food-corner-sales-${a}${a === b ? '' : '-' + b}.csv`, csv);
   }
 
   return (

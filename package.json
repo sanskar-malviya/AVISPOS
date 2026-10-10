@@ -3,7 +3,7 @@
   "private": true,
   "version": "0.1.0",
   "type": "module",
-  "description": "Cloud POS for Aviz Food Point — fast tablet billing for a vegetarian Indian food stall.",
+  "description": "Cloud POS for Avi's Food Corner — fast tablet billing for a vegetarian Indian food stall.",
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",

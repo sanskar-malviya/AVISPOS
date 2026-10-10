@@ -47,7 +47,7 @@ export function Login() {
               VEG
             </span>
             <span className="text-2xl font-extrabold text-tandoori-700">
-              AVIZ FOOD POINT
+              AVI'S FOOD CORNER
             </span>
           </div>
           <p className="text-stone-500 mt-1">Point of Sale — sign in</p>

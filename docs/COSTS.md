@@ -31,7 +31,7 @@ nothing. You only pay for usage *above* the free quotas.
 
 | Item | Cost |
 |---|---|
-| Custom domain (e.g. `pos.avizfood.in`) | ~₹700–1,200/year (optional; the free `*.web.app` address works fine) |
+| Custom domain (e.g. `pos.avisfoodcorner.in`) | ~₹700–1,200/year (optional; the free `*.web.app` address works fine) |
 | Daily managed Firestore backups ([BACKUP.md](BACKUP.md)) | a few ₹/month at this data size |
 | Android tablet (10", landscape) | ₹10,000–20,000 one-time (if not already owned) |
 | 58 mm BLE thermal printer | ~₹1,500–3,500 one-time |

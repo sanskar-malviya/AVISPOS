@@ -1,7 +1,7 @@
 {
   "name": "aviz-pos-functions",
   "private": true,
-  "description": "Cloud Functions for Aviz Food Point POS: order validation, offline order-number reconciliation, audit trail, staff management.",
+  "description": "Cloud Functions for Avi's Food Corner POS: order validation, offline order-number reconciliation, audit trail, staff management.",
   "main": "lib/index.js",
   "engines": {
     "node": "22"

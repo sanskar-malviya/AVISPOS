@@ -1,4 +1,4 @@
-// Aviz Food Point POS — Cloud Functions (2nd gen), deployed to Mumbai.
+// Avi's Food Corner POS — Cloud Functions (2nd gen), deployed to Mumbai.
 //
 //  onOrderCreated   validate every new order's money against the menu, and give
 //                   offline orders their canonical daily order number

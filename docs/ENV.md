@@ -7,7 +7,7 @@
 | `.env.example` | yes | Template listing every variable |
 | `.env` | **no** (git-ignored) | Real Firebase web config for `npm run dev` / `npm run build` |
 | `.env.emulator` | yes | Fake "demo" config used by `npm run dev:emu` (local emulators only) |
-| `.firebaserc` | yes | Default CLI project. Ships as `demo-aviz-pos`; `firebase use --add` adds yours |
+| `.firebaserc` | yes | CLI projects: `default` = the live project (`wabot-66e7c`); `demo` = local emulator sandbox. Change with `firebase use --add` |
 
 ## Variables (`.env`)
 

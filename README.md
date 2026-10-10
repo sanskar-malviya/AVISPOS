@@ -1,6 +1,6 @@
-# Aviz Food Point — Cloud POS
+# Avi's Food Corner — Cloud POS
 
-A fast, touch-first point-of-sale web app for **Aviz Food Point**, a vegetarian Indian food stall.
+A fast, touch-first point-of-sale web app for **Avi's Food Corner**, a vegetarian Indian food stall.
 It runs full-screen on an Android tablet beside the counter. The cashier taps food photos, takes Cash or
 UPI, and a Bluetooth thermal printer prints the receipt. An ordinary order takes about 10 seconds.
 

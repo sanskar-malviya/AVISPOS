@@ -1,5 +1,6 @@
 {
   "projects": {
-    "default": "demo-aviz-pos"
+    "default": "wabot-66e7c",
+    "demo": "demo-aviz-pos"
   }
 }

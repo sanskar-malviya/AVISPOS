@@ -1,8 +1,8 @@
-# Cashier guide — Aviz Food Point POS
+# Cashier guide — Avi's Food Corner POS
 
 ## Start of the day
 1. Switch on the receipt printer.
-2. Open the **Aviz POS** app on the tablet (it may already be open).
+2. Open the **Avi's POS** app on the tablet (it may already be open).
 3. If the top bar shows a yellow **🖨 Connect printer** button, tap it and choose the printer.
 
 ## Taking an order

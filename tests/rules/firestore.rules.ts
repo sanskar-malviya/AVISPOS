@@ -87,7 +87,7 @@ beforeEach(async () => {
     await setDoc(doc(db, 'products/vada-pav'), product());
     await setDoc(doc(db, 'orders/o1'), { ...newOrder('cash1', { id: 'o1', orderNumber: `${DK}-0001` }), createdAt: new Date() });
     await setDoc(doc(db, `counters/${DK}`), { seq: 1, dateKey: DK });
-    await setDoc(doc(db, 'settings/business'), { businessName: 'AVIZ FOOD POINT', paperWidth: '58' });
+    await setDoc(doc(db, 'settings/business'), { businessName: "AVI'S FOOD CORNER", paperWidth: '58' });
     await setDoc(doc(db, 'settings/security'), { ownerPinHash: 'abc' });
   });
 });

@@ -1,4 +1,4 @@
-// Load the default Aviz menu and business settings into an EMPTY database.
+// Load the default menu and business settings into an EMPTY database.
 // Safe to re-run: existing products and settings are never overwritten.
 //
 //   npm run seed               (real project — needs GOOGLE_APPLICATION_CREDENTIALS)
@@ -45,7 +45,7 @@ async function main() {
   const settingsRef = db.collection('settings').doc('business');
   if (!(await settingsRef.get()).exists) {
     await settingsRef.set({
-      businessName: 'AVIZ FOOD POINT',
+      businessName: "AVI'S FOOD CORNER",
       tagline: '100% Vegetarian',
       contact: '',
       receiptHeader: '',

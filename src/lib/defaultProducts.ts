@@ -1,4 +1,4 @@
-// Default menu for Aviz Food Point (spec §3). Dependency-free so it can be
+// Default menu for Avi's Food Corner (spec §3). Dependency-free so it can be
 // imported by both the browser app and the Node seed script.
 //
 // Prices are in integer PAISE: ₹90 = 9000 paise, etc.
