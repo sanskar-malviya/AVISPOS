@@ -11,4 +11,7 @@ export const DEFAULT_SETTINGS: BusinessSettings = {
   printer: { type: 'none' },
   vegLabel: 'VEG',
   receiptLogo: true,
+  receiptWatermark: true,
+  tokenSlip: true,
+  tokenItems: true,
 };

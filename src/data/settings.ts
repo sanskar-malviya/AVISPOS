@@ -28,6 +28,11 @@ function mapSettings(data: Record<string, unknown> | undefined): BusinessSetting
     },
     vegLabel: String(data.vegLabel ?? DEFAULT_SETTINGS.vegLabel),
     receiptLogo: data.receiptLogo !== false,
+    // Before it had its own switch, the watermark followed the logo switch.
+    receiptWatermark:
+      typeof data.receiptWatermark === 'boolean' ? data.receiptWatermark : data.receiptLogo !== false,
+    tokenSlip: data.tokenSlip !== false,
+    tokenItems: data.tokenItems !== false,
   };
 }
 

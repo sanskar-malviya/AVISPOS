@@ -4,7 +4,7 @@ import { photoToDataUrl } from '../../lib/image';
 import { formatINR, paiseToRupees } from '../../lib/money';
 import { useToast } from '../../components/Toast';
 import { useOnline } from '../../app/useOnline';
-import type { Product } from '../../lib/types';
+import type { Product, ProductCategory } from '../../lib/types';
 
 const MAX_PRICE_RUPEES = 99999;
 
@@ -19,6 +19,7 @@ export function ProductEditor({ product, nextSortOrder, onClose }: Props) {
   const online = useOnline();
   const [name, setName] = useState(product?.name ?? '');
   const [price, setPrice] = useState(product ? String(paiseToRupees(product.pricePaise)) : '');
+  const [category, setCategory] = useState<ProductCategory>(product?.category ?? 'main');
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState(product?.imageUrl || '');
   const [saving, setSaving] = useState(false);
@@ -56,11 +57,22 @@ export function ProductEditor({ product, nextSortOrder, onClose }: Props) {
       // The photo is shrunk on the tablet and stored inside the product.
       const imageUrl = file ? await photoToDataUrl(file) : undefined;
       if (!product) {
-        await createProduct({ name: trimmed, pricePaise, sortOrder: nextSortOrder, imageUrl });
-      } else if (trimmed !== product.name || pricePaise !== product.pricePaise || imageUrl) {
+        await createProduct({
+          name: trimmed,
+          pricePaise,
+          sortOrder: nextSortOrder,
+          category,
+          imageUrl,
+        });
+      } else if (
+        trimmed !== product.name ||
+        pricePaise !== product.pricePaise ||
+        category !== product.category ||
+        imageUrl
+      ) {
         await updateProduct(
           product.id,
-          { name: trimmed, pricePaise, ...(imageUrl ? { imageUrl } : {}) },
+          { name: trimmed, pricePaise, category, ...(imageUrl ? { imageUrl } : {}) },
           product,
         );
       }
@@ -133,6 +145,35 @@ export function ProductEditor({ product, nextSortOrder, onClose }: Props) {
                   recorded in the audit log.
                 </p>
               )}
+            </div>
+            <div>
+              <span className="block text-sm font-semibold text-stone-700 mb-1">Section</span>
+              <div className="flex gap-2">
+                {(
+                  [
+                    ['main', 'Main dishes'],
+                    ['extra', 'Extras'],
+                  ] as const
+                ).map(([value, label]) => (
+                  <button
+                    type="button"
+                    key={value}
+                    aria-pressed={category === value}
+                    onClick={() => setCategory(value)}
+                    className={
+                      'btn flex-1 min-h-0 py-2 border-2 text-sm ' +
+                      (category === value
+                        ? 'border-tandoori-700 bg-tandoori-700 text-white'
+                        : 'border-stone-200 bg-white')
+                    }
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+              <p className="text-xs text-stone-500 mt-1">
+                Extras (add-ons like extra bread) appear in a smaller section below the main dishes.
+              </p>
             </div>
           </div>
         </div>

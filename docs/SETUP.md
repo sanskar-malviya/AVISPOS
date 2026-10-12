@@ -24,7 +24,8 @@ For each product you can:
 | Sold out for today | Switch **Available** off | Card stays on the billing screen but greyed out and can't be tapped |
 | Remove from the menu | Switch **On menu** off | Card disappears from billing. Turn it back on any time. |
 | Change the order on screen | ▲ / ▼ arrows | Billing screen shows products in this order |
-| New product | **+ Add product** | Name, whole-rupee price, optional photo |
+| New product | **+ Add product** | Name, whole-rupee price, section, optional photo |
+| Main dish or extra | **Edit → Section: Main dishes / Extras** | Extras (add-ons like extra bread) appear in a smaller section below the main dishes |
 
 Products are never deleted, so old orders and reports always stay correct.
 
@@ -36,7 +37,9 @@ of them so the screen stays easy to read.
 
 **Settings → Business & receipt:** business name, tagline ("100% Vegetarian"), optional contact line,
 optional receipt heading, receipt footer ("Thank you for visiting!"), and **paper width (58 mm or 80 mm)**.
-The preview on the right shows exactly what the receipt will look like.
+Under **When printing**, switch the **logo at the top**, the **logo watermark** and the **separate token
+slip** on or off, each on its own (see [PRINTER.md](PRINTER.md#receipt-contents)).
+The preview on the right shows exactly what the receipt and token slip will look like.
 
 ## 4. Printer
 

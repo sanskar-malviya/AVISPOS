@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { DEFAULT_PRODUCTS, missingDefaultProducts } from '../src/lib/defaultProducts';
+import {
+  DEFAULT_PRODUCTS,
+  defaultCategoryFor,
+  missingDefaultProducts,
+} from '../src/lib/defaultProducts';
 import { formatINR, paiseToRupees, rupeesToPaise, sumPaise } from '../src/lib/money';
 
 describe('default menu', () => {
@@ -15,6 +19,15 @@ describe('default menu', () => {
       'Extra Pav': 10,
       'Extra Kulcha': 15,
     });
+  });
+
+  it('the extra breads go in the Extras section, dishes in the main section', () => {
+    const extras = DEFAULT_PRODUCTS.filter((p) => p.category === 'extra').map((p) => p.name);
+    expect(extras).toEqual(['Extra Bhatura', 'Extra Pav', 'Extra Kulcha']);
+    // Products saved before sections existed: decided by their fixed doc id.
+    expect(defaultCategoryFor('extra-pav')).toBe('extra');
+    expect(defaultCategoryFor('pav-bhaji')).toBe('main');
+    expect(defaultCategoryFor('some-new-dish')).toBe('main');
   });
 
   it('every default item has a bundled photo', () => {

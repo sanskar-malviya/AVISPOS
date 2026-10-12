@@ -4,8 +4,9 @@ import { useShopData } from '../app/data';
 import { useToast } from '../components/Toast';
 import { ConfirmDialog } from '../components/ConfirmDialog';
 import { ReceiptPreview } from '../components/ReceiptPreview';
+import { tokenFor } from '../printer/receipt';
 import { changeOrderStatus, recordReprint, subscribeOrder } from '../data/orders';
-import { printOrderReceipt } from '../printer';
+import { printOrderReceipt, printTokenSlip } from '../printer';
 import { formatINR } from '../lib/money';
 import { formatDateTime, orderTime, paymentLabel } from '../lib/format';
 import type { Order } from '../lib/types';
@@ -65,6 +66,17 @@ export function OrderDetail() {
     setPrinting(false);
   }
 
+  async function reprintToken() {
+    setPrinting(true);
+    setPrintMsg(null);
+    const res = await printTokenSlip(current, settings, {
+      reprint: true,
+      forceBrowser: settings.printer.type === 'none',
+    });
+    setPrintMsg({ ok: res.ok, text: res.message });
+    setPrinting(false);
+  }
+
   async function applyStatus() {
     if (!action) return;
     if (!reason.trim()) {
@@ -86,6 +98,7 @@ export function OrderDetail() {
 
   const rows: [string, string][] = [
     ['Order No.', current.orderNumber],
+    ['Token No.', tokenFor(current)],
     // Online orders also keep a backup number (used only if the server was too
     // slow); show it just for orders that were really sold offline.
     ...(current.provisionalNumber && current.source === 'offline'
@@ -164,6 +177,9 @@ export function OrderDetail() {
             <div className="card p-5 space-y-3">
               <button className="btn-primary w-full h-14 text-lg" onClick={reprint} disabled={printing}>
                 {printing ? 'Printing…' : '🖨 Reprint Receipt'}
+              </button>
+              <button className="btn-secondary w-full h-12" onClick={reprintToken} disabled={printing}>
+                Reprint Token
               </button>
               {printMsg && (
                 <p

@@ -2,9 +2,9 @@
 //
 // Thermal printers print black dots only, line by line, so the logo is turned
 // into a black-and-white (dithered) bitmap and printed at the top of the
-// receipt. Text can't be printed over an image on these printers, so there is
-// no watermark on thermal paper; the browser print and the on-screen receipt
-// also get a faint watermark behind the items.
+// receipt. Text can't be printed over an image on these printers, so the
+// faint watermark behind the items is printed by turning those lines into an
+// image as well (see watermark.ts).
 
 export const LOGO_URL = '/brand/logo.jpg';
 
@@ -21,6 +21,7 @@ export interface MonoBitmap {
 }
 
 const cache = new Map<number, Promise<MonoBitmap>>();
+const grayCache = new Map<number, Promise<Float32Array>>();
 
 function loadImage(src: string): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
@@ -95,6 +96,17 @@ function logoGray(img: HTMLImageElement, size: number): Float32Array {
     if (i < size * (size - 1)) stack.push(i + size);
   }
   return gray;
+}
+
+/** Greyscale logo pixels (white background), `size` x `size`. Cached per size. */
+export function logoGrayPixels(size: number): Promise<Float32Array> {
+  let p = grayCache.get(size);
+  if (!p) {
+    p = loadImage(LOGO_URL).then((img) => logoGray(img, size));
+    p.catch(() => grayCache.delete(size)); // try again next time
+    grayCache.set(size, p);
+  }
+  return p;
 }
 
 /** The logo as a printer bitmap, `widthDots` wide. Cached per width. */

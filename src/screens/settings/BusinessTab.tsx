@@ -16,6 +16,9 @@ type Draft = Pick<
   | 'paperWidth'
   | 'vegLabel'
   | 'receiptLogo'
+  | 'receiptWatermark'
+  | 'tokenSlip'
+  | 'tokenItems'
 >;
 
 function pick(s: BusinessSettings): Draft {
@@ -28,6 +31,9 @@ function pick(s: BusinessSettings): Draft {
     paperWidth: s.paperWidth,
     vegLabel: s.vegLabel,
     receiptLogo: s.receiptLogo,
+    receiptWatermark: s.receiptWatermark,
+    tokenSlip: s.tokenSlip,
+    tokenItems: s.tokenItems,
   };
 }
 
@@ -137,21 +143,46 @@ export function BusinessTab() {
             ))}
           </div>
         </div>
-        <label className="flex items-start gap-3 cursor-pointer">
-          <input
-            type="checkbox"
-            className="mt-1 w-5 h-5 accent-tandoori-700"
-            checked={draft.receiptLogo}
-            onChange={(e) => set('receiptLogo', e.target.checked)}
-          />
-          <span>
-            <span className="block text-sm font-semibold text-stone-700">Logo on receipts</span>
-            <span className="block text-xs text-stone-500">
-              Printed at the top of every receipt. Browser prints also get a faint logo behind the
-              items. Adds about a second to Bluetooth printing.
-            </span>
-          </span>
-        </label>
+<fieldset className="space-y-3">
+          <legend className="block text-sm font-semibold text-stone-700 mb-1">When printing</legend>
+          {(
+            [
+              [
+                'receiptLogo',
+                'Logo at the top',
+                'The shop logo above the receipt. Adds about a second to Bluetooth printing.',
+              ],
+              [
+                'receiptWatermark',
+                'Logo watermark',
+                'A faint logo behind the items. On the Bluetooth printer those lines print as a picture, which adds a few seconds.',
+              ],
+              [
+                'tokenSlip',
+                'Separate token slip',
+                'After the receipt, a small slip with the token number in big type for calling out orders.',
+              ],
+              [
+                'tokenItems',
+                'Food & quantity on the token slip',
+                'Lists what to prepare (e.g. "2 x Extra Bhatura") under the token number.',
+              ],
+            ] as const
+          ).map(([key, title, help]) => (
+            <label key={key} className="flex items-start gap-3 cursor-pointer">
+              <input
+                type="checkbox"
+                className="mt-1 w-5 h-5 accent-tandoori-700"
+                checked={draft[key]}
+                onChange={(e) => set(key, e.target.checked)}
+              />
+              <span>
+                <span className="block text-sm font-semibold text-stone-700">{title}</span>
+                <span className="block text-xs text-stone-500">{help}</span>
+              </span>
+            </label>
+          ))}
+        </fieldset>
         {field('vegLabel', 'Veg badge text', { max: 12 })}
 
         <div className="flex gap-3 pt-2">

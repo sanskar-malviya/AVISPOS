@@ -9,6 +9,7 @@ export interface ReceiptLine {
   align: 'left' | 'center';
   bold?: boolean;
   large?: boolean; // double-height title
+  huge?: boolean; // triple width and height (token number)
 }
 
 export interface ReceiptOptions {
@@ -57,6 +58,18 @@ function twoCol(left: string, right: string, cols: number): string {
   return left.slice(0, Math.max(0, cols - right.length - 1)) + ' ' + right;
 }
 
+/**
+ * Token number called out at the counter: the day's order sequence without
+ * leading zeros ("20261012-0007" → "7"). Orders saved offline only have the
+ * tablet's own sequence until they sync, so their token is marked "OFF" and
+ * can't be confused with an online order's token.
+ */
+export function tokenFor(order: Pick<Order, 'orderNumber' | 'orderNumberProvisional'>): string {
+  const m = /(\d+)$/.exec(order.orderNumber);
+  const n = m ? String(parseInt(m[1], 10)) : order.orderNumber;
+  return order.orderNumberProvisional ? `OFF ${n}` : n;
+}
+
 export function buildReceiptLines(
   order: Order,
   settings: BusinessSettings,
@@ -83,6 +96,7 @@ export function buildReceiptLines(
   if (opts.reprint) center('*** REPRINT ***', { bold: true });
   sep();
 
+  center(`TOKEN NO. ${tokenFor(order)}`, { bold: true, large: true });
   left(`Order No: ${order.orderNumber}`);
   left(`Date: ${formatDateTime(orderTime(order))}`);
   sep();
@@ -117,6 +131,49 @@ export function buildReceiptLines(
   return out;
 }
 
+/**
+ * The separate token slip printed after the receipt: shop name, the token
+ * number in big type, the food and quantities (when switched on) and the
+ * time, so the counter can prepare the order and call it out.
+ */
+export function buildTokenLines(
+  order: Order,
+  settings: BusinessSettings,
+  opts: Pick<ReceiptOptions, 'reprint'> = {},
+): ReceiptLine[] {
+  const cols = columnsFor(settings.paperWidth);
+  const out: ReceiptLine[] = [];
+  const center = (text: string, style: Partial<ReceiptLine> = {}, width = cols) =>
+    wrap(text, width).forEach((t) => out.push({ text: t, align: 'center', ...style }));
+
+  center(settings.businessName.toUpperCase(), { bold: true });
+  if (order.status !== 'completed') center(`*** ${order.status.toUpperCase()} ***`, { bold: true });
+  if (opts.reprint) center('*** REPRINT ***', { bold: true });
+  const sep = () => out.push({ text: '-'.repeat(cols), align: 'left' });
+  sep();
+  center('TOKEN NO.', { bold: true });
+  // Triple-size characters: a third as many fit on a line.
+  center(tokenFor(order), { bold: true, huge: true }, Math.floor(cols / 3));
+  sep();
+  if (settings.tokenItems) {
+    // What to prepare: quantity first so it can be read at a glance.
+    for (const item of order.items) {
+      const qty = `${item.qty} x `;
+      wrap(item.name, cols - qty.length).forEach((name, i) =>
+        out.push({
+          text: (i === 0 ? qty : ' '.repeat(qty.length)) + name,
+          align: 'left',
+          bold: true,
+        }),
+      );
+    }
+    sep();
+  }
+  center(formatDateTime(orderTime(order)));
+  center(`Order No: ${order.orderNumber}`);
+  return out;
+}
+
 function escapeHtml(s: string): string {
   return s
     .replace(/&/g, '&amp;')
@@ -125,27 +182,50 @@ function escapeHtml(s: string): string {
     .replace(/"/g, '&quot;');
 }
 
-/** Standalone HTML document for the browser-print fallback, sized to the roll. */
-export function receiptHtml(
-  lines: ReceiptLine[],
-  width: PaperWidth,
-  opts: { logoUrl?: string } = {},
-): string {
-  const pageW = width === '80' ? '80mm' : '58mm';
-  const contentW = width === '80' ? '72mm' : '48mm';
-  // Logo at the top plus a faint copy behind the items. Plain <img> elements,
-  // because browsers leave CSS backgrounds out of prints by default.
-  const logo = opts.logoUrl
-    ? `<img class="lg" src="${escapeHtml(opts.logoUrl)}" alt=""><img class="wm" src="${escapeHtml(opts.logoUrl)}" alt="">`
-    : '';
-  const body = lines
+function linesHtml(lines: ReceiptLine[]): string {
+  return lines
     .map((l) => {
-      const cls = [l.align === 'center' ? 'c' : 'l', l.bold ? 'b' : '', l.large ? 'g' : '']
+      const cls = [
+        l.align === 'center' ? 'c' : 'l',
+        l.bold ? 'b' : '',
+        l.large ? 'g' : '',
+        l.huge ? 'h' : '',
+      ]
         .filter(Boolean)
         .join(' ');
       return `<div class="${cls}">${escapeHtml(l.text) || '&nbsp;'}</div>`;
     })
     .join('');
+}
+
+export interface ReceiptHtmlOptions {
+  logoUrl?: string;
+  /** Logo at the top (default: on when `logoUrl` is given). */
+  logo?: boolean;
+  /** Faint logo behind the items (default: on when `logoUrl` is given). */
+  watermark?: boolean;
+  /** Token slip, printed on its own page after the receipt. */
+  tokenLines?: ReceiptLine[];
+}
+
+/** Standalone HTML document for the browser-print fallback, sized to the roll. */
+export function receiptHtml(
+  lines: ReceiptLine[],
+  width: PaperWidth,
+  opts: ReceiptHtmlOptions = {},
+): string {
+  const pageW = width === '80' ? '80mm' : '58mm';
+  const contentW = width === '80' ? '72mm' : '48mm';
+  // Plain <img> elements, because browsers leave CSS backgrounds out of prints
+  // by default.
+  const src = opts.logoUrl ? escapeHtml(opts.logoUrl) : '';
+  const logo =
+    (src && (opts.logo ?? true) ? `<img class="lg" src="${src}" alt="">` : '') +
+    (src && (opts.watermark ?? true) ? `<img class="wm" src="${src}" alt="">` : '');
+  const body = linesHtml(lines);
+  const token = opts.tokenLines?.length
+    ? `<div class="r t">${linesHtml(opts.tokenLines)}</div>`
+    : '';
   return `<!doctype html><html><head><meta charset="utf-8"><title>Receipt</title><style>
 @page { size: ${pageW} auto; margin: 0; }
 html, body { margin: 0; padding: 0; background: #fff; color: #000; }
@@ -155,11 +235,13 @@ html, body { margin: 0; padding: 0; background: #fff; color: #000; }
 .c { text-align: center; white-space: pre-wrap; }
 .b { font-weight: 700; }
 .g { font-size: 3.6mm; }
+.h { font-size: 7.5mm; line-height: 1.15; }
+.t { break-before: page; page-break-before: always; }
 .r { position: relative; }
 .r > div { position: relative; z-index: 1; }
 .lg { display: block; width: 22mm; height: 22mm; margin: 0 auto 2mm; border-radius: 50%; }
 .wm { position: absolute; z-index: 0; left: 50%; top: 50%; width: 80%; aspect-ratio: 1;
       transform: translate(-50%, -50%); border-radius: 50%; opacity: 0.1; filter: grayscale(1); }
 * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-</style></head><body><div class="r">${logo}${body}</div></body></html>`;
+</style></head><body><div class="r">${logo}${body}</div>${token}</body></html>`;
 }

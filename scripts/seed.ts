@@ -38,6 +38,7 @@ async function main() {
         active: true,
         available: true,
         sortOrder: firstSortOrder + i,
+        category: p.category,
         createdAt: now,
         updatedAt: now,
         updatedBy: 'seed-script',
@@ -72,6 +73,10 @@ async function main() {
       paperWidth: '58',
       printer: { type: 'none' },
       vegLabel: 'VEG',
+      receiptLogo: true,
+      receiptWatermark: true,
+      tokenSlip: true,
+      tokenItems: true,
       updatedBy: 'seed-script',
       updatedAt: Date.now(),
     });

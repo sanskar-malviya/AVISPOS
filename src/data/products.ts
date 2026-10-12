@@ -13,10 +13,11 @@ import {
 import { auth, db } from '../lib/firebase';
 import {
   DEFAULT_PRODUCTS,
+  defaultCategoryFor,
   defaultProductId,
   missingDefaultProducts,
 } from '../lib/defaultProducts';
-import type { Product } from '../lib/types';
+import type { Product, ProductCategory } from '../lib/types';
 
 const productsCol = collection(db, 'products');
 
@@ -35,6 +36,8 @@ function mapProduct(id: string, data: Record<string, unknown>): Product {
     active: data.active !== false, // default true
     available: data.available !== false, // default true
     sortOrder: Number(data.sortOrder ?? 0),
+    category:
+      data.category === 'extra' || data.category === 'main' ? data.category : defaultCategoryFor(id),
     createdAt: Number(data.createdAt ?? 0),
     updatedAt: Number(data.updatedAt ?? 0),
   };
@@ -96,6 +99,7 @@ export interface NewProductInput {
   name: string;
   pricePaise: number;
   sortOrder: number;
+  category: ProductCategory;
   imageUrl?: string;
 }
 
@@ -109,6 +113,7 @@ function newProductData(input: NewProductInput, lastPriceAuditId: string) {
     active: true,
     available: true,
     sortOrder: input.sortOrder,
+    category: input.category,
     createdAt: now,
     updatedAt: now,
     updatedBy: who(),
@@ -130,7 +135,10 @@ export async function createProduct(input: NewProductInput): Promise<string> {
 }
 
 export type ProductPatch = Partial<
-  Pick<Product, 'name' | 'pricePaise' | 'imageUrl' | 'active' | 'available' | 'sortOrder'>
+  Pick<
+    Product,
+    'name' | 'pricePaise' | 'imageUrl' | 'active' | 'available' | 'sortOrder' | 'category'
+  >
 >;
 
 /**
@@ -192,6 +200,7 @@ export async function seedDefaultProducts(): Promise<void> {
       name: p.name,
       pricePaise: p.pricePaise,
       sortOrder: i,
+      category: p.category,
       imageUrl: p.image,
     });
   }
@@ -208,6 +217,7 @@ export async function addMissingDefaultProducts(existing: Product[]): Promise<vo
       name: p.name,
       pricePaise: p.pricePaise,
       sortOrder: sortOrder++,
+      category: p.category,
       imageUrl: p.image,
     });
   }

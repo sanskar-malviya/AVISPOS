@@ -51,7 +51,9 @@ Use the real tablet, the real printer, the deployed app URL and a **cashier** lo
 
 **Printing (10, 11)**
 - [ ] Printer connected → after payment the receipt prints **without any dialog**.
-- [ ] Receipt matches: name, tagline, order no., date/time, items, qty, amounts, Subtotal, TOTAL, Payment.
+- [ ] Receipt matches: name, tagline, token no., order no., date/time, items, qty, amounts, Subtotal, TOTAL, Payment.
+- [ ] Token slip prints after the receipt with the token number in big type (switch: *When printing → Separate token slip*).
+- [ ] Logo at the top and logo watermark switch on/off independently; the watermark shows faintly behind the items on thermal paper.
 - [ ] Correct width for your roll (58/80 mm); nothing cut off.
 - [ ] Switch the printer **off** → make a sale → red "Printing failed" → switch on → **Retry Print** →
       prints; *Orders* still shows exactly one sale.

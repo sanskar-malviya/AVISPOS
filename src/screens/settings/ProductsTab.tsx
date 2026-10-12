@@ -164,6 +164,9 @@ export function ProductsTab() {
                 <div className="font-bold truncate">{p.name}</div>
                 <div className="text-tandoori-700 font-extrabold">{formatINR(p.pricePaise)}</div>
                 <div className="flex gap-1 mt-0.5">
+                  {p.category === 'extra' && (
+                    <span className="badge bg-red-50 text-tandoori-700">Extra</span>
+                  )}
                   {!p.active && <span className="badge bg-stone-200 text-stone-700">Hidden</span>}
                   {p.active && !p.available && (
                     <span className="badge bg-amber-100 text-amber-800">Unavailable</span>

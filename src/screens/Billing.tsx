@@ -21,6 +21,8 @@ export function Billing() {
     () => products.filter((p) => p.active),
     [products],
   );
+  const mainProducts = visibleProducts.filter((p) => p.category !== 'extra');
+  const extraProducts = visibleProducts.filter((p) => p.category === 'extra');
 
   const lines = useMemo(
     () => buildCartLines(products, qtyByProduct),
@@ -72,16 +74,38 @@ export function Billing() {
             </div>
           </div>
         ) : (
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2.5 sm:gap-4">
-            {visibleProducts.map((p) => (
-              <ProductCard
-                key={p.id}
-                product={p}
-                qty={qtyByProduct[p.id] ?? 0}
-                onTap={() => add(p.id)}
-              />
-            ))}
-          </div>
+          <>
+            {mainProducts.length > 0 && (
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2.5 sm:gap-4">
+                {mainProducts.map((p) => (
+                  <ProductCard
+                    key={p.id}
+                    product={p}
+                    qty={qtyByProduct[p.id] ?? 0}
+                    onTap={() => add(p.id)}
+                  />
+                ))}
+              </div>
+            )}
+            {extraProducts.length > 0 && (
+              <div className={mainProducts.length > 0 ? 'mt-3 sm:mt-4' : ''}>
+                <h2 className="text-sm font-extrabold uppercase tracking-wide text-stone-500 mb-1.5 sm:mb-2">
+                  Extras
+                </h2>
+                <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-2 sm:gap-3">
+                  {extraProducts.map((p) => (
+                    <ProductCard
+                      key={p.id}
+                      product={p}
+                      qty={qtyByProduct[p.id] ?? 0}
+                      onTap={() => add(p.id)}
+                      compact
+                    />
+                  ))}
+                </div>
+              </div>
+            )}
+          </>
         )}
       </section>
 

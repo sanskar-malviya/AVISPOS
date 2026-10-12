@@ -6,8 +6,9 @@ import { useCart, buildCartLines } from '../store/cartStore';
 import { useToast } from '../components/Toast';
 import { ConfirmDialog } from '../components/ConfirmDialog';
 import { ReceiptPreview } from '../components/ReceiptPreview';
+import { tokenFor } from '../printer/receipt';
 import { submitOrder, recordReprint, type SubmitResult } from '../data/orders';
-import { printOrderReceipt, type PrintOutcome } from '../printer';
+import { printOrderReceipt, printTokenSlip, type PrintOutcome } from '../printer';
 import { upiProvider } from '../payments/upi';
 import { newId } from '../lib/ids';
 import { formatINR, sumPaise } from '../lib/money';
@@ -35,6 +36,7 @@ export function Payment() {
   const [saved, setSaved] = useState<SubmitResult | null>(null);
   const [print, setPrint] = useState<PrintState>({ state: 'idle', message: '' });
   const printedOnce = useRef(false);
+  const tokenPrintedOnce = useRef(false);
   const [countdown, setCountdown] = useState<number | null>(null);
 
   const lines = useMemo(() => buildCartLines(products, qtyByProduct), [products, qtyByProduct]);
@@ -70,11 +72,23 @@ export function Payment() {
     if (res.ok) {
       if (isReprint) recordReprint(order.id).catch(() => undefined);
       printedOnce.current = true;
+      if (settings.tokenSlip) tokenPrintedOnce.current = true;
       setPrint({ state: 'ok', message: res.message });
     } else {
       setPrint({ state: 'failed', message: res.message });
     }
     return res;
+  }
+
+  async function doPrintToken(order: Order) {
+    setCountdown(null);
+    setPrint({ state: 'printing', message: 'Printing token…' });
+    const res = await printTokenSlip(order, settings, {
+      forceBrowser: settings.printer.type === 'none',
+      reprint: tokenPrintedOnce.current,
+    });
+    if (res.ok) tokenPrintedOnce.current = true;
+    setPrint({ state: res.ok ? 'ok' : 'failed', message: res.message });
   }
 
   async function confirmPayment(m: PaymentMethod) {
@@ -121,8 +135,10 @@ export function Payment() {
             <p className="mt-1 text-stone-600">
               {formatINR(order.grandTotalPaise)} · {paymentLabel(order.paymentMethod)}
             </p>
-            <p className="mt-3 text-lg">
-              Order No. <span className="font-extrabold">{order.orderNumber}</span>
+            <p className="mt-3 text-sm font-bold uppercase tracking-wide text-stone-500">Token No.</p>
+            <p className="text-5xl font-extrabold text-stone-900 tabular-nums">{tokenFor(order)}</p>
+            <p className="mt-2 text-stone-600">
+              Order No. <span className="font-bold">{order.orderNumber}</span>
             </p>
 
             {saved.provisional && (
@@ -151,16 +167,25 @@ export function Payment() {
             </div>
 
             <div className="mt-5 grid gap-3">
-              <button
-                className="btn-secondary h-14 text-lg"
-                disabled={print.state === 'printing'}
-                onClick={() => {
-                  setCountdown(null);
-                  void doPrint(order, settings.printer.type === 'none');
-                }}
-              >
-                {print.state === 'failed' ? 'Retry Print' : 'Print Receipt'}
-              </button>
+              <div className="grid grid-cols-2 gap-3">
+                <button
+                  className="btn-secondary h-14 text-lg"
+                  disabled={print.state === 'printing'}
+                  onClick={() => {
+                    setCountdown(null);
+                    void doPrint(order, settings.printer.type === 'none');
+                  }}
+                >
+                  {print.state === 'failed' ? 'Retry Print' : 'Print Receipt'}
+                </button>
+                <button
+                  className="btn-secondary h-14 text-lg"
+                  disabled={print.state === 'printing'}
+                  onClick={() => void doPrintToken(order)}
+                >
+                  Print Token
+                </button>
+              </div>
               {print.state === 'failed' && settings.printer.type === 'bluetooth' && (
                 <button
                   className="btn-ghost"

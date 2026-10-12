@@ -67,15 +67,30 @@ paper came out, check the paper and tap **Print Receipt** again.
 
 ## Receipt contents
 
-Business name, tagline, optional heading/contact, order number, date & time, items (name, qty, amount),
-subtotal, **TOTAL**, payment method (Cash/UPI) and the footer. Thermal printers can't print the ₹ sign, so
-Bluetooth receipts show **Rs.**; browser-printed receipts show **₹**.
+Business name, tagline, optional heading/contact, **token number**, order number, date & time, items
+(name, qty, amount), subtotal, **TOTAL**, payment method (Cash/UPI) and the footer. Thermal printers can't
+print the ₹ sign, so Bluetooth receipts show **Rs.**; browser-printed receipts show **₹**.
 
-**Logo.** The shop logo (`public/brand/logo.jpg`) is printed at the top of every receipt. On a thermal
-printer it comes out as a black-and-white dot pattern about 24 mm wide (30 mm on 80 mm paper); it adds
-about a second to printing. Thermal printers can't print text over an image, so the faint watermark behind
-the items appears only on browser-printed receipts and on screen. The on-screen receipt can't be selected
-or copied. Switch the logo off under *Settings → Business & receipt → Logo on receipts*.
+**Token number.** The day's order sequence without leading zeros: order `20261012-0007` is token **7**.
+It is printed on the receipt and also on a separate **token slip** after it: shop name, "TOKEN NO.", the
+number in big type (three times normal size), the food and quantities (e.g. `2 x Extra Bhatura`), time
+and order number. On a printer with a cutter the slip is cut off separately; otherwise tear it off.
+**Print Token** (after payment) and **Reprint Token** (in *Orders*) print just the slip again. Orders saved offline get a token like **OFF 4** until they
+sync, so they never clash with an online token. Reprints say *REPRINT* on both.
+
+Three switches under *Settings → Business & receipt → When printing* control the extras independently:
+
+| Switch | Effect | Bluetooth printing time |
+|---|---|---|
+| **Logo at the top** | Shop logo (`public/brand/logo.jpg`) above the receipt, about 24 mm wide (30 mm on 80 mm paper) | about +1 s |
+| **Logo watermark** | Faint logo behind the items | about +4–5 s |
+| **Separate token slip** | The token slip after the receipt | under +1 s |
+| **Food & quantity on the token slip** | Lists what to prepare under the token number | — |
+
+Thermal printers can't print text over an image, so with the watermark on, the lines behind it are printed
+as one picture (text and faint logo together) and the rest stays normal printer text. That picture is why
+the watermark takes a few seconds; switch it off if the queue is long. The on-screen receipt can't be
+selected or copied.
 
 None of this makes a paper receipt impossible to copy, since anyone can photocopy one. To check whether a
 receipt is genuine, search its order number in **Orders**: a real one shows the same items, total and time.

@@ -4,6 +4,9 @@
 
 export type ID = string;
 
+/** Billing-screen section: main dishes, or small add-ons such as extra bread. */
+export type ProductCategory = 'main' | 'extra';
+
 export interface Product {
   id: ID;
   name: string;
@@ -13,6 +16,7 @@ export interface Product {
   active: boolean; // false = hidden from billing entirely
   available: boolean; // false = temporarily unavailable (shown but not sellable)
   sortOrder: number;
+  category: ProductCategory;
   createdAt: number; // epoch ms
   updatedAt: number; // epoch ms
 }
@@ -70,7 +74,10 @@ export interface BusinessSettings {
   paperWidth: PaperWidth;
   printer: PrinterConfig;
   vegLabel: string; // short veg indicator text, e.g. "VEG"
-  receiptLogo: boolean; // print the shop logo on receipts
+  receiptLogo: boolean; // print the shop logo at the top of receipts
+  receiptWatermark: boolean; // faint logo behind the receipt items
+  tokenSlip: boolean; // print a separate token slip after the receipt
+  tokenItems: boolean; // list the food and quantities on the token slip
 }
 // NOTE: the owner PIN hash is deliberately NOT part of BusinessSettings. It lives
 // in settings/security, which only owner accounts can read (see firestore.rules).

@@ -7,18 +7,19 @@ export interface DefaultProduct {
   name: string;
   pricePaise: number;
   image: string; // bundled placeholder under /products/
+  category: 'main' | 'extra';
 }
 
 export const DEFAULT_PRODUCTS: DefaultProduct[] = [
-  { name: 'Chole Bhature', pricePaise: 9000, image: '/products/chole-bhature.jpg' },
-  { name: 'Pav Bhaji', pricePaise: 7000, image: '/products/pav-bhaji.jpg' },
-  { name: 'Veg Biryani', pricePaise: 5000, image: '/products/veg-biryani.jpg' },
-  { name: 'Chole Kulche', pricePaise: 6000, image: '/products/chole-kulche.jpg' },
-  { name: 'Vada Pav', pricePaise: 3000, image: '/products/vada-pav.jpg' },
-  // Add-ons, sold per piece.
-  { name: 'Extra Bhatura', pricePaise: 2000, image: '/products/extra-bhatura.jpg' },
-  { name: 'Extra Pav', pricePaise: 1000, image: '/products/extra-pav.jpg' },
-  { name: 'Extra Kulcha', pricePaise: 1500, image: '/products/extra-kulcha.jpg' },
+  { name: 'Chole Bhature', pricePaise: 9000, image: '/products/chole-bhature.jpg', category: 'main' },
+  { name: 'Pav Bhaji', pricePaise: 7000, image: '/products/pav-bhaji.jpg', category: 'main' },
+  { name: 'Veg Biryani', pricePaise: 5000, image: '/products/veg-biryani.jpg', category: 'main' },
+  { name: 'Chole Kulche', pricePaise: 6000, image: '/products/chole-kulche.jpg', category: 'main' },
+  { name: 'Vada Pav', pricePaise: 3000, image: '/products/vada-pav.jpg', category: 'main' },
+  // Add-ons, sold per piece — shown in the smaller Extras section.
+  { name: 'Extra Bhatura', pricePaise: 2000, image: '/products/extra-bhatura.jpg', category: 'extra' },
+  { name: 'Extra Pav', pricePaise: 1000, image: '/products/extra-pav.jpg', category: 'extra' },
+  { name: 'Extra Kulcha', pricePaise: 1500, image: '/products/extra-kulcha.jpg', category: 'extra' },
 ];
 
 /** Doc id used for a default product (stable, human-readable). */
@@ -27,6 +28,14 @@ export function defaultProductId(name: string): string {
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/(^-|-$)/g, '');
+}
+
+/**
+ * Section for a product saved before products had a `category`: the default
+ * add-ons (matched by their fixed doc id) are extras, everything else is main.
+ */
+export function defaultCategoryFor(id: string): 'main' | 'extra' {
+  return DEFAULT_PRODUCTS.find((p) => defaultProductId(p.name) === id)?.category ?? 'main';
 }
 
 /**

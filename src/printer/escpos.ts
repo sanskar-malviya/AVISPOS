@@ -20,17 +20,27 @@ export function toPrinterText(text: string): string {
 
 export function encodeEscPos(
   lines: ReceiptLine[],
-  opts: { feedLines?: number; cut?: boolean; logo?: Uint8Array } = {},
+  opts: {
+    feedLines?: number;
+    cut?: boolean;
+    logo?: Uint8Array;
+    /** Raster image printed in place of lines `from`…`to - 1` (see watermark.ts). */
+    image?: { from: number; to: number; data: Uint8Array };
+  } = {},
 ): Uint8Array {
   const out: number[] = [
     ESC, 0x40, // initialise printer
     ESC, 0x74, 0x00, // code page PC437 (ASCII-safe)
   ];
   if (opts.logo) for (const b of opts.logo) out.push(b); // raster logo, see logo.ts
-  for (const line of lines) {
+  const image = opts.image;
+  for (const [i, line] of lines.entries()) {
+    if (image && i === image.from) for (const b of image.data) out.push(b);
+    if (image && i >= image.from && i < image.to) continue;
     out.push(ESC, 0x61, line.align === 'center' ? 1 : 0); // alignment
     out.push(ESC, 0x45, line.bold ? 1 : 0); // emphasis
-    out.push(GS, 0x21, line.large ? 0x01 : 0x00); // double height
+    // Character size: triple width+height, double height, or normal.
+    out.push(GS, 0x21, line.huge ? 0x22 : line.large ? 0x01 : 0x00);
     for (const ch of toPrinterText(line.text)) out.push(ch.charCodeAt(0));
     out.push(LF);
   }
@@ -38,4 +48,14 @@ export function encodeEscPos(
   out.push(ESC, 0x64, opts.feedLines ?? 4); // feed paper past the tear bar
   if (opts.cut) out.push(GS, 0x56, 0x42, 0x00); // partial cut (ignored if no cutter)
   return new Uint8Array(out);
+}
+
+export function concatBytes(...parts: Uint8Array[]): Uint8Array {
+  const out = new Uint8Array(parts.reduce((n, p) => n + p.length, 0));
+  let at = 0;
+  for (const p of parts) {
+    out.set(p, at);
+    at += p.length;
+  }
+  return out;
 }
