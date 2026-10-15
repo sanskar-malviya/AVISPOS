@@ -41,7 +41,9 @@ The app recognises the print channels used by most common BLE thermal printers. 
 
 1. Switch the printer on and load paper.
 2. *Settings → Printer →* select **Bluetooth thermal printer** → **Connect printer**.
-3. Pick the printer in Chrome's list → **Pair**.
+3. Pick the printer in Chrome's list → **Pair**. The list shows only Bluetooth thermal printers. If yours
+   isn't there, close the list and tap **Show all devices** to look through every nearby device (a few
+   printers only announce themselves as a printer once connected).
 4. Tap **Print test receipt**. You should get a sample receipt (no sale is recorded).
 5. Set the right paper width in *Settings → Business & receipt* (58 mm = 32 characters/line, 80 mm =
    48 characters/line).
@@ -49,9 +51,14 @@ The app recognises the print channels used by most common BLE thermal printers. 
 ## Everyday use
 
 - The top bar shows **🖨 Printer ready** when connected. Receipts print automatically after every payment.
-- After the app or tablet restarts, Chrome may require one tap to reconnect. If the yellow
-  **🖨 Connect printer** button shows, tap it and pick the printer. Chrome only allows a website to start a
-  Bluetooth connection from a tap, which is why this can't be fully automatic.
+- After the app or tablet restarts, the app reconnects the last printer **by itself** when it opens, and
+  tries again each time you come back to the app (e.g. after switching the printer on). Only if that fails
+  does the yellow **🖨 Connect printer** button show — tap it and pick the printer. Chrome only allows a
+  website to open the Bluetooth picker from a tap, which is why this step can't be automatic.
+- Silent reconnection needs Chrome to remember the printer permission across restarts. Recent Chrome
+  versions do this by default; if the yellow button shows after **every** restart even with the printer
+  on, open `chrome://flags/#enable-web-bluetooth-new-permissions-backend` in Chrome on the tablet, set it
+  to **Enabled**, relaunch Chrome and connect the printer once more.
 - If the printer is off, out of range or out of battery, the payment still completes and the order is
   **saved**. The success screen shows a clear red **Printing failed** message with **Retry Print** and
   **Print with browser instead**.
@@ -107,7 +114,8 @@ receipt is genuine, search its order number in **Orders**: a real one shows the 
 
 | Problem | Try |
 |---|---|
-| Printer not in Chrome's list | Printer on and in pairing mode? Bluetooth on? *Nearby devices* permission allowed? Is it a BLE printer (nRF Connect)? |
+| Printer not in Chrome's list | Tap **Show all devices** when offered. Printer on and in pairing mode? Bluetooth on? *Nearby devices* permission allowed? Is it a BLE printer (nRF Connect)? |
+| Yellow Connect button after every restart | Chrome isn't keeping the printer permission — see the Chrome flag under *Everyday use*. |
 | "Not supported in this browser" | Use Chrome on Android, opened via the https app URL (not a file or an IP address). |
 | Connected but "no printing channel" | Classic-Bluetooth-only printer → use the fallback above. |
 | Garbled characters | Printer not in ESC/POS mode (see its manual / self-test page). |

@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
 import { useShopData } from '../app/data';
-import { useToast } from './Toast';
+import { useConnectPrinter } from './useConnectPrinter';
 import {
-  connectBluetoothPrinter,
   onPrinterStatus,
+  reconnectSavedPrinter,
+  savedPrinterName,
   type PrinterStatus,
 } from '../printer/bluetooth';
 
@@ -17,40 +18,54 @@ const LABEL: Record<PrinterStatus, string> = {
 
 /**
  * Top-bar printer status. Shown only when a Bluetooth printer is configured.
- * Tapping it while disconnected opens the Bluetooth picker (browsers require a
- * real tap for this), so the cashier can reconnect in one tap each morning.
+ *
+ * When the app opens (and whenever it comes back to the foreground) it first
+ * tries to reconnect the last printer silently. The button only turns yellow
+ * if that fails; tapping it opens the Bluetooth picker (browsers require a
+ * real tap for this).
  */
 export function PrinterButton() {
   const { settings } = useShopData();
-  const toast = useToast();
   const [status, setStatus] = useState<PrinterStatus>('disconnected');
+  const { connect, busy, dialog } = useConnectPrinter();
+  const bluetooth = settings.printer.type === 'bluetooth';
 
   useEffect(() => onPrinterStatus(setStatus), []);
 
-  if (settings.printer.type !== 'bluetooth') return null;
+  useEffect(() => {
+    if (!bluetooth) return;
+    void reconnectSavedPrinter();
+    // Printer switched on after the app? Try again each time the tablet wakes
+    // or the cashier returns to the app.
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') void reconnectSavedPrinter();
+    };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => document.removeEventListener('visibilitychange', onVisible);
+  }, [bluetooth]);
 
-  const ok = status === 'connected' || status === 'printing';
+  if (!bluetooth) return null;
+
+  const idle = status === 'disconnected' || status === 'unsupported';
+  const paired = settings.printer.deviceName || savedPrinterName();
   return (
-    <button
-      onClick={async () => {
-        if (ok || status === 'connecting') return;
-        try {
-          const name = await connectBluetoothPrinter();
-          toast.success(`Printer connected: ${name}`);
-        } catch (e) {
-          toast.error(e instanceof Error ? e.message : 'Could not connect the printer.');
+    <>
+      <button
+        onClick={() => {
+          if (idle && !busy) void connect();
+        }}
+        className={
+          'text-sm font-semibold px-2.5 sm:px-3 py-1.5 rounded-lg flex items-center gap-1.5 whitespace-nowrap ' +
+          (idle ? 'bg-amber-400 text-amber-950 hover:bg-amber-300' : 'bg-white/10')
         }
-      }}
-      className={
-        'text-sm font-semibold px-2.5 sm:px-3 py-1.5 rounded-lg flex items-center gap-1.5 whitespace-nowrap ' +
-        (ok ? 'bg-white/10' : 'bg-amber-400 text-amber-950 hover:bg-amber-300')
-      }
-      aria-label={LABEL[status]}
-      title={settings.printer.deviceName ? `Paired: ${settings.printer.deviceName}` : LABEL[status]}
-    >
-      <span aria-hidden>🖨</span>
-      {/* On phones the colour alone says it: amber = tap to connect. */}
-      <span className="hidden lg:inline">{LABEL[status]}</span>
-    </button>
+        aria-label={LABEL[status]}
+        title={paired ? `Printer: ${paired}` : LABEL[status]}
+      >
+        <span aria-hidden>🖨</span>
+        {/* On phones the colour alone says it: amber = tap to connect. */}
+        <span className="hidden lg:inline">{LABEL[status]}</span>
+      </button>
+      {dialog}
+    </>
   );
 }

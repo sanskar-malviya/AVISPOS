@@ -26,6 +26,7 @@ interface BtDevice extends EventTarget {
 interface BtApi {
   requestDevice(options: {
     acceptAllDevices?: boolean;
+    filters?: { services: string[] }[];
     optionalServices?: string[];
   }): Promise<BtDevice>;
   getDevices?: () => Promise<BtDevice[]>;
@@ -58,6 +59,8 @@ export type PrinterStatus = 'unsupported' | 'disconnected' | 'connecting' | 'con
 let device: BtDevice | null = null;
 let characteristic: BtCharacteristic | null = null;
 let status: PrinterStatus = 'disconnected';
+/** Set when the user taps Disconnect, so the app doesn't silently reconnect right away. */
+let manuallyDisconnected = false;
 const listeners = new Set<(s: PrinterStatus) => void>();
 
 function setStatus(s: PrinterStatus) {
@@ -86,6 +89,8 @@ export function connectedPrinterName(): string {
 }
 
 export class PrinterError extends Error {}
+/** The picker was closed without choosing a device (cancelled, or nothing listed). */
+export class NoPrinterSelectedError extends PrinterError {}
 
 const UNSUPPORTED =
   'Bluetooth printing is not supported in this browser. Use Google Chrome on the Android tablet (over https).';
@@ -149,15 +154,26 @@ async function attach(dev: BtDevice): Promise<void> {
 /**
  * Show the browser's Bluetooth picker and connect. MUST be called directly from
  * a user tap (browser security rule). Returns the printer's name.
+ *
+ * By default the list is limited to devices that advertise a known printer
+ * service, so the cashier isn't scrolling past phones, watches and TVs. Some
+ * printers don't advertise their service until connected; `allDevices: true`
+ * shows everything nearby for those.
  */
-export async function connectBluetoothPrinter(): Promise<string> {
+export async function connectBluetoothPrinter(opts: { allDevices?: boolean } = {}): Promise<string> {
   const api = bt();
   if (!api || !window.isSecureContext) throw new PrinterError(UNSUPPORTED);
+  manuallyDisconnected = false;
   let dev: BtDevice;
   try {
-    dev = await api.requestDevice({ acceptAllDevices: true, optionalServices: KNOWN_SERVICES });
+    dev = await api.requestDevice(
+      opts.allDevices
+        ? { acceptAllDevices: true, optionalServices: KNOWN_SERVICES }
+        : { filters: KNOWN_SERVICES.map((s) => ({ services: [s] })), optionalServices: KNOWN_SERVICES },
+    );
   } catch (e) {
-    if ((e as Error).name === 'NotFoundError') throw new PrinterError('No printer was selected.');
+    if ((e as Error).name === 'NotFoundError')
+      throw new NoPrinterSelectedError('No printer was selected.');
     throw e;
   }
   await attach(dev);
@@ -165,10 +181,36 @@ export async function connectBluetoothPrinter(): Promise<string> {
 }
 
 export function disconnectBluetoothPrinter(): void {
+  manuallyDisconnected = true;
   device?.gatt?.disconnect();
   device = null;
   characteristic = null;
   setStatus('disconnected');
+}
+
+let reconnecting: Promise<boolean> | null = null;
+
+/**
+ * Silently reconnect the printer used last time — no picker, no tap needed.
+ * Works when Chrome remembered the permission (navigator.bluetooth.getDevices)
+ * and the printer is on and in range. Resolves true when connected; never
+ * throws. Safe to call repeatedly: concurrent calls share one attempt.
+ */
+export function reconnectSavedPrinter(): Promise<boolean> {
+  if (reconnecting) return reconnecting;
+  reconnecting = (async () => {
+    try {
+      if (!isBluetoothSupported() || manuallyDisconnected) return false;
+      if (device?.gatt?.connected && characteristic) return true;
+      await ensureConnected();
+      return true;
+    } catch {
+      return false;
+    } finally {
+      reconnecting = null;
+    }
+  })();
+  return reconnecting;
 }
 
 /**
@@ -200,6 +242,16 @@ async function ensureConnected(): Promise<BtCharacteristic> {
     }
   }
   throw new PrinterError('Printer not connected. Tap the printer button in the top bar to connect it.');
+}
+
+/** Name of the printer connected last time (for the top-bar hint), '' if none. */
+export function savedPrinterName(): string {
+  try {
+    const saved = JSON.parse(localStorage.getItem(LAST_DEVICE_KEY) || 'null') as { name?: string } | null;
+    return saved?.name ?? '';
+  } catch {
+    return '';
+  }
 }
 
 /**

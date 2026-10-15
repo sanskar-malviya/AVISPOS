@@ -3,7 +3,8 @@
 ## Start of the day
 1. Switch on the receipt printer.
 2. Open the **Avi's POS** app on the tablet (it may already be open).
-3. If the top bar shows a yellow **🖨 Connect printer** button, tap it and choose the printer.
+3. The app connects to the printer by itself. Only if the top bar still shows a yellow
+   **🖨 Connect printer** button, tap it and choose the printer (tap **Show all devices** if it isn't listed).
 
 ## Taking an order
 1. **Tap the food photo** once for each plate. Tap Chole Bhature twice = 2 Chole Bhature.

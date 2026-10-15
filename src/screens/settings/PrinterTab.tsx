@@ -2,8 +2,8 @@ import { useEffect, useState } from 'react';
 import { useShopData } from '../../app/data';
 import { useToast } from '../../components/Toast';
 import { saveSettings } from '../../data/settings';
+import { useConnectPrinter } from '../../components/useConnectPrinter';
 import {
-  connectBluetoothPrinter,
   connectedPrinterName,
   disconnectBluetoothPrinter,
   isBluetoothSupported,
@@ -51,18 +51,13 @@ export function PrinterTab() {
     }
   }
 
-  async function connect() {
-    setBusy(true);
-    try {
-      const name = await connectBluetoothPrinter();
-      await saveSettings({ printer: { type: 'bluetooth', deviceName: name } });
-      toast.success(`Connected to ${name}`);
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : 'Could not connect.');
-    } finally {
-      setBusy(false);
-    }
-  }
+  const {
+    connect,
+    busy: connecting,
+    dialog: connectDialog,
+  } = useConnectPrinter(async (name) => {
+    await saveSettings({ printer: { type: 'bluetooth', deviceName: name } });
+  });
 
   async function testPrint() {
     setBusy(true);
@@ -132,7 +127,11 @@ export function PrinterTab() {
                 <p className="text-sm text-stone-500">Last paired: {settings.printer.deviceName}</p>
               )}
               <div className="flex flex-wrap gap-3">
-                <button className="btn-primary" disabled={busy} onClick={() => void connect()}>
+                <button
+                  className="btn-primary"
+                  disabled={busy || connecting}
+                  onClick={() => void connect()}
+                >
                   {connected ? 'Pair a different printer' : 'Connect printer'}
                 </button>
                 {connected && (
@@ -142,14 +141,16 @@ export function PrinterTab() {
                 )}
               </div>
               <p className="text-xs text-stone-500">
-                Switch the printer on, then tap Connect and pick it from the list. Chrome may ask
-                for “Nearby devices” permission — allow it. After restarting the tablet, tap the
-                printer button in the top bar once to reconnect.
+                Switch the printer on, then tap Connect and pick it from the list (only thermal
+                printers are listed; if yours is missing you can show all devices). Chrome may ask
+                for “Nearby devices” permission — allow it. From then on the app reconnects by
+                itself when it opens; the top-bar printer button turns yellow only if that fails.
               </p>
             </>
           )}
         </div>
       )}
+      {connectDialog}
 
       <div className="card p-5 space-y-3">
         <p className="font-semibold">Test print</p>

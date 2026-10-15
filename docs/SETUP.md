@@ -61,8 +61,8 @@ settings or look at reports.
 
 ## 6. Daily routine
 
-- **Morning:** switch on the printer, open the app, tap the yellow **Connect printer** button in the top bar
-  if it shows.
+- **Morning:** switch on the printer, open the app. It reconnects the printer by itself; tap the yellow
+  **Connect printer** button in the top bar only if it shows.
 - **During the day:** sold-out items → *Settings → Products → Available off*.
 - **Evening:** **Orders** shows today's summary: total collected, Cash vs UPI, quantity per product. Tap
   **Export CSV** to keep a copy for your accounts. Count the cash drawer against the **Cash** figure.
