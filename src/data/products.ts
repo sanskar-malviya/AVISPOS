@@ -11,6 +11,7 @@ import {
   type WriteBatch,
 } from 'firebase/firestore';
 import { auth, db } from '../lib/firebase';
+import { callFunction } from './api';
 import {
   DEFAULT_PRODUCTS,
   defaultCategoryFor,
@@ -185,6 +186,16 @@ export async function reorderProducts(orderedIds: string[]): Promise<void> {
     batch.update(doc(productsCol, id), { sortOrder: i, updatedAt: now, updatedBy: who() }),
   );
   await batch.commit();
+}
+
+/**
+ * Delete a product that has never been sold. The security rules forbid deletes
+ * from the app, so this goes through the owner-only `products` server
+ * function, which checks every order first and refuses (409) if the product
+ * appears in any of them. Needs an internet connection.
+ */
+export async function deleteProduct(id: string): Promise<void> {
+  await callFunction('products', { body: { action: 'delete', id } });
 }
 
 /** Slug used as the doc id for the default products (stable, human-readable). */

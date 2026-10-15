@@ -26,8 +26,10 @@ For each product you can:
 | Change the order on screen | ▲ / ▼ arrows | Billing screen shows products in this order |
 | New product | **+ Add product** | Name, whole-rupee price, section, optional photo |
 | Main dish or extra | **Edit → Section: Main dishes / Extras** | Extras (add-ons like extra bread) appear in a smaller section below the main dishes |
+| Delete a product | **Edit → Delete product** → confirm | Only works for a product that has **never been sold** (e.g. added by mistake). Needs internet. |
 
-Products are never deleted, so old orders and reports always stay correct.
+A product that has been sold can't be deleted — the app refuses and tells you so — because old orders
+and reports need it. Hide it with **On menu** off instead. Deletions are recorded in the audit log.
 
 **Photos:** the app ships with sample photos of each dish. For the best result, replace them over time
 with bright, close-up, landscape photos of *your own* plates. Use the same angle and background for all
@@ -70,3 +72,12 @@ settings or look at reports.
 **Orders →** tap the order → **Cancel order** or **Mark refunded** → enter a reason. The order stays in
 history marked Cancelled/Refunded and is removed from the sales totals. The change is recorded in the audit
 log. Sales can never be deleted.
+
+## Correcting Cash / UPI on an order
+
+Typical case: the cashier chose UPI, the payment didn't go through (no network), and the customer paid
+cash — but the order is saved as UPI. **Orders →** tap the order → **Change payment to Cash** (or **to
+UPI**) → optional note → confirm. Only the payment method changes; the amount, items and order number
+stay as they were, the Cash and UPI totals update at once, and a reprinted receipt shows the corrected
+method. The order shows "corrected by owner" and the change is recorded in the audit log. Only the owner
+can do this.

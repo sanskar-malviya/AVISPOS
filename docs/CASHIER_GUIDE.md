@@ -29,6 +29,7 @@ The receipt prints by itself, then the screen returns to a new order. Tap **New 
 | Customer changes their mind before paying | **Clear Order** → confirm. |
 | Need to go back from the payment screen | Tap **← Back to Order**. The items stay. |
 | Customer wants a refund or cancellation after paying | Call the owner. Only the owner can cancel or refund. |
+| You chose UPI but the payment failed and the customer paid cash (or the other way round) | Note the order number and tell the owner. The owner can change the order to Cash or UPI; the amount stays the same. |
 | A dish is sold out | Tell the owner (they switch it to unavailable). |
 
 ## Good to know

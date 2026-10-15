@@ -12,6 +12,7 @@ process.env.LOCAL_BLOBS_DIR ??= join(process.cwd(), '.local-backups');
 type Handler = (req: Request) => Promise<Response>;
 const handlers: Record<string, () => Promise<{ default: Handler }>> = {
   staff: () => import('../netlify/functions/staff.mts'),
+  products: () => import('../netlify/functions/products.mts'),
   'process-orders': () => import('../netlify/functions/process-orders.mts'),
   backups: () => import('../netlify/functions/backups.mts'),
   // Scheduled functions can be run by hand locally: POST /.netlify/functions/<name>

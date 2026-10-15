@@ -5,11 +5,16 @@ import { useToast } from '../components/Toast';
 import { ConfirmDialog } from '../components/ConfirmDialog';
 import { ReceiptPreview } from '../components/ReceiptPreview';
 import { tokenFor } from '../printer/receipt';
-import { changeOrderStatus, recordReprint, subscribeOrder } from '../data/orders';
+import {
+  changeOrderStatus,
+  changePaymentMethod,
+  recordReprint,
+  subscribeOrder,
+} from '../data/orders';
 import { printOrderReceipt, printTokenSlip } from '../printer';
 import { formatINR } from '../lib/money';
 import { formatDateTime, orderTime, paymentLabel } from '../lib/format';
-import type { Order } from '../lib/types';
+import type { Order, PaymentMethod } from '../lib/types';
 
 type StatusAction = 'cancelled' | 'refunded';
 
@@ -25,6 +30,8 @@ export function OrderDetail() {
   const [action, setAction] = useState<StatusAction | null>(null);
   const [reason, setReason] = useState('');
   const [saving, setSaving] = useState(false);
+  const [payTo, setPayTo] = useState<PaymentMethod | null>(null);
+  const [payNote, setPayNote] = useState('');
 
   useEffect(
     () =>
@@ -96,6 +103,23 @@ export function OrderDetail() {
     }
   }
 
+  async function applyPayment() {
+    if (!payTo) return;
+    setSaving(true);
+    try {
+      await changePaymentMethod(current, payTo, payNote);
+      toast.success(`Payment changed to ${paymentLabel(payTo)}`);
+      setPayTo(null);
+      setPayNote('');
+    } catch (e) {
+      toast.error(`Could not update the order: ${e instanceof Error ? e.message : e}`);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  const otherMethod: PaymentMethod = current.paymentMethod === 'upi' ? 'cash' : 'upi';
+
   const rows: [string, string][] = [
     ['Order No.', current.orderNumber],
     ['Token No.', tokenFor(current)],
@@ -105,7 +129,11 @@ export function OrderDetail() {
       ? ([['Offline receipt no.', current.provisionalNumber]] as [string, string][])
       : []),
     ['Date & time', formatDateTime(orderTime(current))],
-    ['Payment', `${paymentLabel(current.paymentMethod)} · ${current.paymentStatus}`],
+    [
+      'Payment',
+      `${paymentLabel(current.paymentMethod)} · ${current.paymentStatus}` +
+        (current.paymentCorrected ? ' (corrected by owner)' : ''),
+    ],
     ['Status', current.status + (current.statusReason ? ` — ${current.statusReason}` : '')],
     ['Receipt reprints', String(current.reprintCount)],
     ['Sync', pending ? 'Waiting to sync (saved on device)' : 'Saved to cloud'],
@@ -192,18 +220,27 @@ export function OrderDetail() {
                 </p>
               )}
               {current.status === 'completed' && (
-                <div className="grid grid-cols-2 gap-3 pt-2 border-t border-stone-100">
-                  <button className="btn-danger" onClick={() => setAction('cancelled')}>
-                    Cancel order
+                <>
+                  <button
+                    className="btn-secondary w-full h-12"
+                    onClick={() => setPayTo(otherMethod)}
+                  >
+                    Change payment to {paymentLabel(otherMethod)}
                   </button>
-                  <button className="btn-danger" onClick={() => setAction('refunded')}>
-                    Mark refunded
-                  </button>
-                </div>
+                  <div className="grid grid-cols-2 gap-3 pt-2 border-t border-stone-100">
+                    <button className="btn-danger" onClick={() => setAction('cancelled')}>
+                      Cancel order
+                    </button>
+                    <button className="btn-danger" onClick={() => setAction('refunded')}>
+                      Mark refunded
+                    </button>
+                  </div>
+                </>
               )}
               <p className="text-xs text-stone-500">
                 Sales are never deleted. Cancelled and refunded orders stay in history but are
-                excluded from sales totals, and every change is recorded in the audit log.
+                excluded from sales totals. Changing the payment method only moves the amount
+                between the Cash and UPI totals. Every change is recorded in the audit log.
               </p>
             </div>
           </div>
@@ -241,6 +278,42 @@ export function OrderDetail() {
         onCancel={() => {
           setAction(null);
           setReason('');
+        }}
+      />
+
+      <ConfirmDialog
+        open={payTo !== null}
+        title={`Change payment to ${payTo ? paymentLabel(payTo) : ''}?`}
+        confirmLabel={saving ? 'Saving…' : `Change to ${payTo ? paymentLabel(payTo) : ''}`}
+        cancelLabel="Keep as is"
+        message={
+          <div>
+            <p>
+              {formatINR(current.grandTotalPaise)} will be counted as{' '}
+              <strong>{payTo ? paymentLabel(payTo) : ''}</strong> instead of{' '}
+              {paymentLabel(current.paymentMethod)} in the sales totals. The total and the items
+              don't change. This is recorded in the audit log.
+            </p>
+            <label className="block text-sm font-semibold text-stone-700 mt-3 mb-1">
+              Note (optional)
+            </label>
+            <textarea
+              className="input w-full"
+              rows={2}
+              maxLength={200}
+              value={payNote}
+              onChange={(e) => setPayNote(e.target.value)}
+              placeholder="e.g. UPI failed, customer paid cash"
+            />
+          </div>
+        }
+        onConfirm={() => {
+          if (!saving) void applyPayment();
+        }}
+        onCancel={() => {
+          if (saving) return;
+          setPayTo(null);
+          setPayNote('');
         }}
       />
     </div>

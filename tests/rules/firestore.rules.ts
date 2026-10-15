@@ -136,6 +136,41 @@ function statusBatch({ db, status = 'cancelled', reason = 'Customer changed mind
   return b.commit();
 }
 
+interface PaymentChange {
+  db: Firestore;
+  to?: 'cash' | 'upi';
+  by?: string;
+  auditId?: string;
+  extra?: Record<string, unknown>; // extra fields on the order update
+  audit?: false | Partial<{ before: string; amountPaise: number; reason: unknown; who: string }>;
+}
+/** Correct the payment method the way the app does: order update + audit entry in one batch. */
+function paymentBatch({ db, to = 'upi', by = 'owner1', auditId, extra = {}, audit = {} }: PaymentChange) {
+  const id = auditId ?? `order-o1-payment-${++seq}`;
+  const b = writeBatch(db);
+  b.update(doc(db, 'orders/o1'), {
+    paymentMethod: to,
+    paymentChangedBy: by,
+    paymentChangedAt: serverTimestamp(),
+    lastPaymentAuditId: id,
+    ...extra,
+  });
+  if (audit !== false) {
+    b.set(doc(db, 'audit', id), {
+      type: 'payment_change',
+      orderId: 'o1',
+      orderNumber: `${DK}-0001`,
+      before: audit.before ?? (to === 'upi' ? 'cash' : 'upi'),
+      after: to,
+      amountPaise: audit.amountPaise ?? 3000,
+      reason: 'reason' in audit ? audit.reason : 'UPI failed, paid cash',
+      who: audit.who ?? by,
+      at: serverTimestamp(),
+    });
+  }
+  return b.commit();
+}
+
 beforeAll(async () => {
   env = await initializeTestEnvironment({
     projectId: 'demo-aviz-pos-rules',
@@ -229,8 +264,9 @@ describe('products and the price history', () => {
     );
   });
 
-  it('products can never be deleted', async () => {
+  it('products can never be deleted from the app (only the server function may)', async () => {
     await assertFails(deleteDoc(doc(owner(), 'products/vada-pav')));
+    await assertFails(deleteDoc(doc(cashier(), 'products/vada-pav')));
   });
 });
 
@@ -378,6 +414,57 @@ describe('orders', () => {
   it('completed sales can never be deleted', async () => {
     await assertFails(deleteDoc(doc(cashier(), 'orders/o1')));
     await assertFails(deleteDoc(doc(owner(), 'orders/o1')));
+  });
+});
+
+describe('correcting the payment method', () => {
+  it('an owner can change cash ↔ UPI together with an audit entry, more than once', async () => {
+    await assertSucceeds(paymentBatch({ db: owner(), to: 'upi' }));
+    await assertSucceeds(paymentBatch({ db: owner(), to: 'cash' }));
+    await assertSucceeds(paymentBatch({ db: owner2(), to: 'upi', by: 'owner2', audit: { reason: '' } }));
+  });
+
+  it('cashiers cannot change it', async () => {
+    await assertFails(paymentBatch({ db: cashier(), by: 'cash1' }));
+  });
+
+  it('WITHOUT an audit entry, or with a false one, is rejected', async () => {
+    await assertFails(paymentBatch({ db: owner(), audit: false }));
+    await assertFails(updateDoc(doc(owner(), 'orders/o1'), { paymentMethod: 'upi' }));
+    await assertFails(paymentBatch({ db: owner(), audit: { before: 'upi' } }));
+    await assertFails(paymentBatch({ db: owner(), audit: { amountPaise: 1 } }));
+    await assertFails(paymentBatch({ db: owner(), audit: { who: 'someone-else' } }));
+    await assertFails(paymentBatch({ db: owner(), audit: { reason: 'x'.repeat(201) } }));
+    await assertFails(paymentBatch({ db: owner(), by: 'someone-else' }));
+  });
+
+  it('an old audit entry cannot be pointed at again', async () => {
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), 'audit/order-o1-payment-1'), {
+        type: 'payment_change', orderId: 'o1', orderNumber: `${DK}-0001`, before: 'cash', after: 'upi',
+        amountPaise: 3000, reason: '', who: 'owner1', at: new Date(),
+      });
+    });
+    await assertFails(paymentBatch({ db: owner(), auditId: 'order-o1-payment-1', audit: false }));
+    await assertFails(paymentBatch({ db: owner(), auditId: 'order-o1-payment-1' }));
+    // An entry named for another order is refused too.
+    await assertFails(paymentBatch({ db: owner(), auditId: 'order-o2-payment-7' }));
+  });
+
+  it('only the method may change — not the amount, the items or the status', async () => {
+    await assertFails(paymentBatch({ db: owner(), to: 'cash' })); // same as before: no-op
+    await assertFails(paymentBatch({ db: owner(), extra: { grandTotalPaise: 1 } }));
+    await assertFails(paymentBatch({ db: owner(), extra: { items: [] } }));
+    await assertFails(paymentBatch({ db: owner(), extra: { status: 'refunded' } }));
+    await assertFails(paymentBatch({ db: owner(), extra: { paymentStatus: 'unpaid' } }));
+    await assertFails(
+      paymentBatch({ db: owner(), to: 'card' as 'upi', audit: { before: 'cash' } }),
+    );
+  });
+
+  it('is not allowed on a cancelled or refunded order', async () => {
+    await assertSucceeds(statusBatch({ db: owner() }));
+    await assertFails(paymentBatch({ db: owner() }));
   });
 });
 

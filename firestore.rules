@@ -61,7 +61,9 @@ service cloud.firestore {
                    == resource.data.get('lastPriceAuditId', ''))
             || (request.resource.data.pricePaise != resource.data.pricePaise
               && priceAudited(productId, resource.data.pricePaise)));
-      // Never delete products: past orders reference them. Deactivate instead.
+      // Never delete products from the app: past orders reference them.
+      // Deactivate instead. (The owner-only `products` server function may
+      // delete a product after checking that it was never sold.)
       allow delete: if false;
     }
 
@@ -129,13 +131,35 @@ service cloud.firestore {
         && existsAfter(docPath('audit', 'order-' + orderId + '-' + next.status));
     }
 
+    // Correcting how a completed order was paid (e.g. UPI failed, the customer
+    // paid cash). Only the method changes — never the amount — and a fresh
+    // audit entry must be created in the same batch.
+    function isPaymentChange(orderId) {
+      let next = request.resource.data;
+      let auditId = next.lastPaymentAuditId;
+      return resource.data.status == 'completed'
+        && next.paymentMethod in ['cash', 'upi']
+        && next.paymentMethod != resource.data.paymentMethod
+        && next.diff(resource.data).affectedKeys()
+             .hasOnly(['paymentMethod', 'paymentChangedBy', 'paymentChangedAt',
+                       'lastPaymentAuditId'])
+        && next.paymentChangedBy == request.auth.uid
+        && next.paymentChangedAt == request.time
+        && auditId is string
+        && auditId.matches('^order-' + orderId + '-payment-[0-9]+$')
+        // A NEW entry: an old one can't be pointed at again.
+        && !exists(docPath('audit', auditId))
+        && existsAfter(docPath('audit', auditId));
+    }
+
     match /orders/{orderId} {
       // Cashiers may fetch a single order (needed by the idempotent checkout
       // transaction); only owners may list / browse order history.
       allow get: if isStaff();
       allow list: if isOwner();
       allow create: if isStaff() && validNewOrder(request.resource.data, orderId);
-      allow update: if (isStaff() && isReprint()) || (isOwner() && isStatusChange(orderId));
+      allow update: if (isStaff() && isReprint())
+        || (isOwner() && (isStatusChange(orderId) || isPaymentChange(orderId)));
       // Completed sales can never be deleted from the app.
       allow delete: if false;
     }
@@ -202,12 +226,34 @@ service cloud.firestore {
         && a.at == request.time;
     }
 
+    // Payment-method correction: only alongside the order update it describes.
+    function validPaymentAudit(entryId) {
+      let a = request.resource.data;
+      let before = get(docPath('orders', a.orderId)).data;
+      let after = getAfter(docPath('orders', a.orderId)).data;
+      return a.type == 'payment_change'
+        && a.keys().hasOnly(['type', 'orderId', 'orderNumber', 'before', 'after',
+                             'amountPaise', 'reason', 'who', 'at'])
+        && a.orderId is string
+        && after.lastPaymentAuditId == entryId
+        && a.before == before.paymentMethod
+        && a.after == after.paymentMethod
+        && a.before != a.after
+        && a.amountPaise == after.grandTotalPaise
+        && a.orderNumber == after.orderNumber
+        && a.reason is string && a.reason.size() <= 200
+        && a.who == request.auth.uid
+        && a.at == request.time;
+    }
+
     match /audit/{entryId} {
       allow read: if isOwner();
       allow create: if isOwner()
         && ((request.resource.data.type == 'price_change' && validPriceAudit(entryId))
             || (request.resource.data.type in ['order_cancel', 'refund']
-                && validStatusAudit(entryId)));
+                && validStatusAudit(entryId))
+            || (request.resource.data.type == 'payment_change'
+                && validPaymentAudit(entryId)));
       // Nobody can edit or remove history.
       allow update, delete: if false;
     }

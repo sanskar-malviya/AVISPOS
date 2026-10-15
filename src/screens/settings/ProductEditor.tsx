@@ -1,8 +1,9 @@
 import { useEffect, useState, type FormEvent } from 'react';
-import { createProduct, updateProduct } from '../../data/products';
+import { createProduct, deleteProduct, updateProduct } from '../../data/products';
 import { photoToDataUrl } from '../../lib/image';
 import { formatINR, paiseToRupees } from '../../lib/money';
 import { useToast } from '../../components/Toast';
+import { ConfirmDialog } from '../../components/ConfirmDialog';
 import { useOnline } from '../../app/useOnline';
 import type { Product, ProductCategory } from '../../lib/types';
 
@@ -24,6 +25,8 @@ export function ProductEditor({ product, nextSortOrder, onClose }: Props) {
   const [preview, setPreview] = useState(product?.imageUrl || '');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     if (!file) return;
@@ -82,6 +85,23 @@ export function ProductEditor({ product, nextSortOrder, onClose }: Props) {
       setError(`Could not save: ${err instanceof Error ? err.message : err}`);
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function remove() {
+    if (!product) return;
+    setDeleting(true);
+    try {
+      // The server refuses (409) if the product appears in any order.
+      await deleteProduct(product.id);
+      toast.success(`${product.name} deleted`);
+      setConfirmDelete(false);
+      onClose();
+    } catch (err) {
+      setConfirmDelete(false);
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setDeleting(false);
     }
   }
 
@@ -182,15 +202,52 @@ export function ProductEditor({ product, nextSortOrder, onClose }: Props) {
           <p className="mt-4 text-sm font-semibold text-red-700 bg-red-50 rounded-lg px-3 py-2">{error}</p>
         )}
 
-        <div className="mt-6 flex justify-end gap-3">
+        <div className="mt-6 flex flex-wrap items-center gap-3">
+          {product && (
+            <button
+              type="button"
+              className="btn-danger min-h-0 py-2 text-sm"
+              onClick={() => setConfirmDelete(true)}
+              disabled={saving || deleting}
+            >
+              Delete product
+            </button>
+          )}
+          <div className="flex-1" />
           <button type="button" className="btn-secondary" onClick={onClose} disabled={saving}>
             Cancel
           </button>
-          <button type="submit" className="btn-primary" disabled={saving}>
+          <button type="submit" className="btn-primary" disabled={saving || deleting}>
             {saving ? 'Saving…' : 'Save'}
           </button>
         </div>
       </form>
+
+      {product && (
+        // Clicks on the confirmation must not reach the editor backdrop (which closes it).
+        <div onClick={(e) => e.stopPropagation()}>
+        <ConfirmDialog
+          open={confirmDelete}
+          title={`Delete ${product.name}?`}
+          danger
+          confirmLabel={deleting ? 'Deleting…' : 'Delete product'}
+          cancelLabel="Keep product"
+          message={
+            <p>
+              Only a product that has <strong>never been sold</strong> can be deleted. If it has
+              been sold, the delete will be refused — switch <strong>On menu</strong> off to hide it
+              instead. This cannot be undone.
+            </p>
+          }
+          onConfirm={() => {
+            if (!deleting) void remove();
+          }}
+          onCancel={() => {
+            if (!deleting) setConfirmDelete(false);
+          }}
+        />
+        </div>
+      )}
     </div>
   );
 }

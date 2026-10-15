@@ -2,9 +2,9 @@
 
 Testing happens on two levels:
 
-1. **Automated**, on any computer. These ran and passed on 10 Oct 2026:
-   - `npm test`: 33 unit tests (cart, money, defaults, receipt layout, ESC/POS, reports/CSV, server validation, backup format)
-   - `npm run test:rules`: 31 Firestore security-rules tests (incl. audit-log enforcement)
+1. **Automated**, on any computer. These ran and passed on 15 Oct 2026:
+   - `npm test`: 55 unit tests (cart, money, defaults, receipt layout, ESC/POS, reports/CSV, server validation, backup format)
+   - `npm run test:rules`: 37 Firestore security-rules tests (incl. audit-log enforcement and Cash/UPI corrections)
    - `npm run test:e2e`: 43 checks driving the real app in a browser against the Firebase emulators,
      tablet-sized landscape window with touch
    - A production build was also checked on a phone-sized screen (360 and 390 px wide, no sideways
@@ -75,6 +75,10 @@ Use the real tablet, the real printer, the deployed app URL and a **cashier** lo
 - [ ] Change a price → billing shows it at once → new sale uses it; an older order still shows the old price.
 - [ ] *Orders* today: total = Cash + UPI; counts match; CSV export opens in Excel/Sheets.
 - [ ] Cancel an order with a reason → excluded from totals, listed as cancelled.
+- [ ] Open a UPI order → **Change payment to Cash** → Cash/UPI totals move by that amount; order shows
+      "corrected by owner"; reprint says Payment: Cash.
+- [ ] Add a test product → *Edit → Delete product* → gone. Try deleting a product that has been sold →
+      refused with a message; switch *On menu* off instead.
 - [ ] Cashier login can't see Orders/Settings; Settings asks for the owner PIN.
 
 Tested by: ______________ Date: __________ Tablet model: ______________ Printer model: ______________

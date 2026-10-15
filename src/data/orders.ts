@@ -254,6 +254,7 @@ export function mapOrder(id: string, data: Record<string, unknown>): Order {
     provisionalNumber: String(data.provisionalNumber ?? ''),
     source: data.source === 'offline' ? 'offline' : 'online',
     statusReason: String(data.statusReason ?? ''),
+    ...(data.lastPaymentAuditId ? { paymentCorrected: true } : {}),
   };
 }
 
@@ -356,6 +357,41 @@ export async function changeOrderStatus(
     after: status,
     amountPaise: order.grandTotalPaise,
     reason: statusReason,
+    who: uid,
+    at: serverTimestamp(),
+  });
+  await batch.commit();
+}
+
+/**
+ * Correct how a completed order was paid (owner only), e.g. UPI was selected
+ * but the payment failed and the customer paid cash. Only the method changes;
+ * the amount and everything else stay as sold. The change and its audit entry
+ * are written in ONE batch, and the rules insist on a fresh entry every time.
+ */
+export async function changePaymentMethod(
+  order: Pick<Order, 'id' | 'orderNumber' | 'grandTotalPaise' | 'paymentMethod'>,
+  method: PaymentMethod,
+  reason = '',
+): Promise<void> {
+  if (method === order.paymentMethod) return;
+  const uid = auth.currentUser?.uid ?? '';
+  const auditId = `order-${order.id}-payment-${Date.now()}`;
+  const batch = writeBatch(db);
+  batch.update(doc(ordersCol, order.id), {
+    paymentMethod: method,
+    paymentChangedBy: uid,
+    paymentChangedAt: serverTimestamp(),
+    lastPaymentAuditId: auditId,
+  });
+  batch.set(doc(db, 'audit', auditId), {
+    type: 'payment_change',
+    orderId: order.id,
+    orderNumber: order.orderNumber,
+    before: order.paymentMethod,
+    after: method,
+    amountPaise: order.grandTotalPaise,
+    reason: reason.trim().slice(0, 200),
     who: uid,
     at: serverTimestamp(),
   });

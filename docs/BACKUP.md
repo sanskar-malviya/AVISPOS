@@ -4,9 +4,11 @@
 
 - **Sales can't be deleted** from the app, by anyone (enforced by the security rules). Cancellations and
   refunds are status changes with a reason.
-- **Audit log:** every price change, cancellation, refund and staff-role change is recorded. The security
-  rules refuse a price change or cancellation that doesn't come with its audit entry. Nobody can edit or
-  delete the log.
+- **Audit log:** every price change, cancellation, refund, Cash/UPI correction, product deletion and
+  staff-role change is recorded. The security rules refuse a price change, cancellation or payment
+  correction that doesn't come with its audit entry. Nobody can edit or delete the log.
+- **Products that have been sold can't be deleted**, so past orders always point at a real product. Only
+  a never-sold product (added by mistake) can be deleted, and only by the owner.
 - **Offline protection:** orders made without internet are stored on the tablet and sync when the
   connection returns. Don't clear Chrome's site data or uninstall the app while the orange Offline bar is
   showing, or unsynced orders on that device would be lost.

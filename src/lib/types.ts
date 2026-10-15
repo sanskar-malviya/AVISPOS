@@ -56,6 +56,7 @@ export interface Order {
   provisionalNumber: string; // original offline number after reconciliation ('' if none)
   source: OrderSource;
   statusReason: string; // reason given for cancel/refund ('' otherwise)
+  paymentCorrected?: boolean; // true once the owner changed cash↔UPI after the sale
 }
 
 export type PaperWidth = '58' | '80';

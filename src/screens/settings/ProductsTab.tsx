@@ -199,7 +199,8 @@ export function ProductsTab() {
 
       <p className="mt-3 text-xs text-stone-500">
         <strong>Available</strong> off = shown greyed out for today (e.g. sold out).{' '}
-        <strong>On menu</strong> off = hidden from billing entirely. Products are never deleted, so
+        <strong>On menu</strong> off = hidden from billing entirely. A product that has never been
+        sold can be deleted from <strong>Edit</strong>; one that has been sold can only be hidden, so
         past orders and reports stay intact.
       </p>
 
