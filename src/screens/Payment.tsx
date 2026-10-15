@@ -15,7 +15,7 @@ import { formatINR, sumPaise } from '../lib/money';
 import { paymentLabel } from '../lib/format';
 import type { Order, PaymentMethod } from '../lib/types';
 
-const AUTO_RETURN_SECONDS = 4;
+const AUTO_RETURN_SECONDS = 5;
 
 type PrintState = { state: 'idle' | 'printing' | 'ok' | 'failed'; message: string };
 
