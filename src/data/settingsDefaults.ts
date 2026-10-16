@@ -14,4 +14,5 @@ export const DEFAULT_SETTINGS: BusinessSettings = {
   receiptWatermark: true,
   tokenSlip: true,
   tokenItems: true,
+  dayStartHour: 0,
 };

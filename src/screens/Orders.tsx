@@ -28,6 +28,36 @@ function StatusBadge({ order, pending }: { order: Order; pending: boolean }) {
 
 const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`;
 
+// The chosen dates survive opening an order and coming back (and a reload),
+// so the owner doesn't have to pick them again. A "today" range follows the
+// current day, so the screen isn't stuck on yesterday the next morning.
+const RANGE_KEY = 'aviz.orders.range';
+const isDk = (v: unknown): v is string => typeof v === 'string' && /^\d{8}$/.test(v);
+
+function loadRange(today: string): { from: string; to: string } {
+  try {
+    const s = JSON.parse(sessionStorage.getItem(RANGE_KEY) || 'null') as {
+      from?: unknown;
+      to?: unknown;
+      today?: unknown;
+    } | null;
+    if (s && isDk(s.from) && isDk(s.to) && !(s.from === s.today && s.to === s.today)) {
+      return { from: s.from, to: s.to };
+    }
+  } catch {
+    /* ignore */
+  }
+  return { from: today, to: today };
+}
+
+function saveRange(from: string, to: string, today: string) {
+  try {
+    sessionStorage.setItem(RANGE_KEY, JSON.stringify({ from, to, today }));
+  } catch {
+    /* ignore */
+  }
+}
+
 function Stat({ label, value, sub }: { label: string; value: string; sub?: string }) {
   return (
     <div className="card p-4">
@@ -42,8 +72,9 @@ export function Orders() {
   const navigate = useNavigate();
   const toast = useToast();
   const today = dateKey();
-  const [from, setFrom] = useState(today);
-  const [to, setTo] = useState(today);
+  const [from, setFrom] = useState(() => loadRange(today).from);
+  const [to, setTo] = useState(() => loadRange(today).to);
+  useEffect(() => saveRange(from, to, today), [from, to, today]);
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);

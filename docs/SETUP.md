@@ -43,6 +43,11 @@ Under **When printing**, switch the **logo at the top**, the **logo watermark** 
 slip** on or off, each on its own (see [PRINTER.md](PRINTER.md#receipt-contents)).
 The preview on the right shows exactly what the receipt and token slip will look like.
 
+**Business day starts at** (same screen): if you sell past midnight, set this to e.g. **3:00 am**. Sales
+between midnight and 3 am then count as the *previous* day — they continue that day's order numbers and
+tokens and show in that day's report. It applies to new sales from the moment you save; earlier sales
+keep the day they were recorded under.
+
 ## 4. Printer
 
 **Settings → Printer.** Choose **Bluetooth thermal printer**, tap **Connect printer**, pick your printer from

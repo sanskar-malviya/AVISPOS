@@ -33,7 +33,16 @@ function mapSettings(data: Record<string, unknown> | undefined): BusinessSetting
       typeof data.receiptWatermark === 'boolean' ? data.receiptWatermark : data.receiptLogo !== false,
     tokenSlip: data.tokenSlip !== false,
     tokenItems: data.tokenItems !== false,
+    dayStartHour: clampDayStart(data.dayStartHour),
   };
+}
+
+export const MAX_DAY_START_HOUR = 6;
+
+function clampDayStart(v: unknown): number {
+  const n = Number(v);
+  if (!Number.isInteger(n) || n < 0) return 0;
+  return Math.min(n, MAX_DAY_START_HOUR);
 }
 
 export function subscribeSettings(

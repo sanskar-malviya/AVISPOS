@@ -19,7 +19,8 @@
 Every night at **00:15 India time**, the `backup-daily` server function saves the business day that just
 ended to Netlify Blobs: that day's orders, audit entries and order counter, plus a copy of the menu and
 business settings. The owner PIN is never included. Each file is about 0.5 MB, and backups are kept
-indefinitely.
+indefinitely. The run also re-saves the day before, so sales made after midnight under a late
+"business day starts at" setting are included the following night.
 
 **To download one:** *Settings → PIN, staff & backups → Backups* → **⬇ Download** next to the date. Keep
 your own copy somewhere else too (Google Drive, email to yourself), e.g. once a week.

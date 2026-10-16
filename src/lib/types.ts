@@ -79,6 +79,12 @@ export interface BusinessSettings {
   receiptWatermark: boolean; // faint logo behind the receipt items
   tokenSlip: boolean; // print a separate token slip after the receipt
   tokenItems: boolean; // list the food and quantities on the token slip
+  /**
+   * Hour (0–6) at which a new business day starts. With 3, a sale at 1 am on
+   * the 15th belongs to the 14th: its order number, token and the daily
+   * report all use the 14th. 0 = midnight (calendar day).
+   */
+  dayStartHour: number;
 }
 // NOTE: the owner PIN hash is deliberately NOT part of BusinessSettings. It lives
 // in settings/security, which only owner accounts can read (see firestore.rules).

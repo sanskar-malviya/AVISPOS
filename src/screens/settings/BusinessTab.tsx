@@ -2,7 +2,7 @@ import { useEffect, useState, type FormEvent } from 'react';
 import { useShopData } from '../../app/data';
 import { useToast } from '../../components/Toast';
 import { ReceiptPreview } from '../../components/ReceiptPreview';
-import { saveSettings } from '../../data/settings';
+import { MAX_DAY_START_HOUR, saveSettings } from '../../data/settings';
 import { sampleOrder } from '../../lib/sampleOrder';
 import type { BusinessSettings, PaperWidth } from '../../lib/types';
 
@@ -19,7 +19,10 @@ type Draft = Pick<
   | 'receiptWatermark'
   | 'tokenSlip'
   | 'tokenItems'
+  | 'dayStartHour'
 >;
+
+const hourLabel = (h: number) => (h === 0 ? '12:00 am (midnight)' : `${h}:00 am`);
 
 function pick(s: BusinessSettings): Draft {
   return {
@@ -34,6 +37,7 @@ function pick(s: BusinessSettings): Draft {
     receiptWatermark: s.receiptWatermark,
     tokenSlip: s.tokenSlip,
     tokenItems: s.tokenItems,
+    dayStartHour: s.dayStartHour,
   };
 }
 
@@ -184,6 +188,28 @@ export function BusinessTab() {
           ))}
         </fieldset>
         {field('vegLabel', 'Veg badge text', { max: 12 })}
+
+        <div>
+          <label className="block text-sm font-semibold text-stone-700 mb-1">
+            Business day starts at
+          </label>
+          <select
+            className="input w-full"
+            value={draft.dayStartHour}
+            onChange={(e) => set('dayStartHour', Number(e.target.value))}
+          >
+            {Array.from({ length: MAX_DAY_START_HOUR + 1 }, (_, h) => (
+              <option key={h} value={h}>
+                {hourLabel(h)}
+              </option>
+            ))}
+          </select>
+          <p className="text-xs text-stone-500 mt-1">
+            Sales made after midnight but before this time count as the previous day: same day's
+            order numbers and tokens, and they appear in that day's report. Applies to new sales
+            from now on; earlier sales keep their day.
+          </p>
+        </div>
 
         <div className="flex gap-3 pt-2">
           <button className="btn-primary" disabled={saving || !dirty}>

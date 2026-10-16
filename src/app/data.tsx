@@ -8,6 +8,7 @@ import {
 import { subscribeProducts } from '../data/products';
 import { subscribeSettings, DEFAULT_SETTINGS } from '../data/settings';
 import { requestServerCheckAfterSync } from '../data/serverCheck';
+import { setDayStartHour } from '../lib/ids';
 import type { BusinessSettings, Product } from '../lib/types';
 
 interface ShopDataValue {
@@ -46,7 +47,10 @@ export function ShopDataProvider({ children }: { children: ReactNode }) {
       },
     );
     const unsubSettings = subscribeSettings(
-      (s) => setSettings(s),
+      (s) => {
+        setSettings(s);
+        setDayStartHour(s.dayStartHour); // order numbers/reports follow the business day
+      },
       (e) => setError(e.message),
     );
     // Orders sold offline are checked (and get their final number) by the

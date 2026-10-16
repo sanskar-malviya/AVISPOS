@@ -29,11 +29,45 @@ export function getDeviceId(): string {
   }
 }
 
-/** Local-date key as YYYYMMDD (used for daily counters and reports). */
-export function dateKey(d: Date = new Date()): string {
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
+const DAY_START_KEY = 'aviz.dayStartHour';
+
+/**
+ * Hour at which the business day rolls over (settings → "Business day starts
+ * at"). Kept in localStorage too, so the very first sale after the app opens
+ * — before the settings snapshot arrives — already uses the right day.
+ */
+let dayStartHour = (() => {
+  try {
+    const n = Number(localStorage.getItem(DAY_START_KEY));
+    return Number.isInteger(n) && n >= 0 && n <= 23 ? n : 0;
+  } catch {
+    return 0;
+  }
+})();
+
+export function setDayStartHour(hour: number): void {
+  dayStartHour = Number.isInteger(hour) && hour >= 0 && hour <= 23 ? hour : 0;
+  try {
+    localStorage.setItem(DAY_START_KEY, String(dayStartHour));
+  } catch {
+    /* ignore */
+  }
+}
+
+export function getDayStartHour(): number {
+  return dayStartHour;
+}
+
+/**
+ * Business-day key as YYYYMMDD (used for order numbers, daily counters and
+ * reports). Times before `startHour` (e.g. 1 am with a 3 am start) count as
+ * the previous day, so a late-night sale stays on that day's report.
+ */
+export function dateKey(d: Date = new Date(), startHour: number = dayStartHour): string {
+  const shifted = new Date(d.getTime() - startHour * 60 * 60 * 1000);
+  const y = shifted.getFullYear();
+  const m = String(shifted.getMonth() + 1).padStart(2, '0');
+  const day = String(shifted.getDate()).padStart(2, '0');
   return `${y}${m}${day}`;
 }
 
