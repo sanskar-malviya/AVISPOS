@@ -206,19 +206,43 @@ export function Orders() {
           <h1 className="text-xl font-extrabold mb-3">Sales summary · {rangeLabel}</h1>
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
             <Stat label="Completed orders" value={String(summary.completedCount)} />
-            <Stat label="Total collected" value={formatINR(summary.totalPaise)} />
+            <Stat
+              label="Total collected"
+              value={formatINR(summary.totalPaise)}
+              sub={
+                summary.refunded.paise > 0
+                  ? `${formatINR(summary.received.paise)} received − ${formatINR(summary.refunded.paise)} refunded`
+                  : undefined
+              }
+            />
             <Stat
               label="Cash"
               value={formatINR(summary.cashPaise)}
-              sub={plural(summary.cashCount, 'order')}
+              sub={
+                plural(summary.cashCount, 'order') +
+                (summary.refunded.cashPaise > 0
+                  ? ` · ${formatINR(summary.refunded.cashPaise)} refunded in cash`
+                  : '')
+              }
             />
-            <Stat label="UPI" value={formatINR(summary.upiPaise)} sub={plural(summary.upiCount, 'order')} />
+            <Stat
+              label="UPI"
+              value={formatINR(summary.upiPaise)}
+              sub={
+                plural(summary.upiCount, 'order') +
+                (summary.refunded.upiPaise > 0
+                  ? ` · ${formatINR(summary.refunded.upiPaise)} refunded by UPI`
+                  : '')
+              }
+            />
           </div>
           {(summary.cancelled.count > 0 || summary.refunded.count > 0) && (
             <p className="mt-2 text-sm text-stone-600">
-              Not counted in sales: {summary.cancelled.count} cancelled (
-              {formatINR(summary.cancelled.paise)}) · {summary.refunded.count} refunded (
-              {formatINR(summary.refunded.paise)})
+              {summary.cancelled.count > 0 &&
+                `Not counted in sales: ${summary.cancelled.count} cancelled (${formatINR(summary.cancelled.paise)})`}
+              {summary.cancelled.count > 0 && summary.refunded.count > 0 && ' · '}
+              {summary.refunded.count > 0 &&
+                `Refunds given: ${plural(summary.refunded.count, 'order')}, ${formatINR(summary.refunded.paise)} (cash ${formatINR(summary.refunded.cashPaise)}, UPI ${formatINR(summary.refunded.upiPaise)})`}
             </p>
           )}
         </div>

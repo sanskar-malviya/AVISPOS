@@ -9,20 +9,36 @@ export interface ProductTally {
 }
 
 export interface SalesSummary {
+  /** Orders that brought money in: completed, plus partially refunded ones. */
   completedCount: number;
-  totalPaise: number; // collected = completed + paid orders ONLY
-  cashPaise: number;
-  upiPaise: number;
+  /** NET collected = received − refunded. */
+  totalPaise: number;
+  cashPaise: number; // net: cash received − cash refunds (what should be in the drawer)
+  upiPaise: number; // net: UPI received − UPI refunds
   cashCount: number;
   upiCount: number;
+  /** Gross money received before refunds, by method. */
+  received: { paise: number; cashPaise: number; upiPaise: number };
   cancelled: { count: number; paise: number };
-  refunded: { count: number; paise: number };
+  /** Refunds paid out, by the method they were given back. */
+  refunded: { count: number; paise: number; cashPaise: number; upiPaise: number };
   products: ProductTally[]; // from collected orders only, best sellers first
 }
 
-/** Only completed AND paid orders count as collected revenue. */
+/** Amount given back on a refunded order (0 otherwise). */
+export function refundOf(o: Order): number {
+  if (o.status !== 'refunded') return 0;
+  return Math.min(o.refundPaise ?? o.grandTotalPaise, o.grandTotalPaise);
+}
+
+/**
+ * Orders that count as sales: completed and paid, or refunded only in part.
+ * A fully refunded order brought nothing in, so it is excluded like before.
+ */
 export function isCollected(o: Order): boolean {
-  return o.status === 'completed' && o.paymentStatus === 'paid';
+  if (o.paymentStatus !== 'paid') return false;
+  if (o.status === 'completed') return true;
+  return o.status === 'refunded' && refundOf(o) < o.grandTotalPaise;
 }
 
 export function summarize(orders: Order[]): SalesSummary {
@@ -33,8 +49,9 @@ export function summarize(orders: Order[]): SalesSummary {
     upiPaise: 0,
     cashCount: 0,
     upiCount: 0,
+    received: { paise: 0, cashPaise: 0, upiPaise: 0 },
     cancelled: { count: 0, paise: 0 },
-    refunded: { count: 0, paise: 0 },
+    refunded: { count: 0, paise: 0, cashPaise: 0, upiPaise: 0 },
     products: [],
   };
   // Tally by name snapshot so historic names stay correct even after renames.
@@ -46,22 +63,25 @@ export function summarize(orders: Order[]): SalesSummary {
       s.cancelled.paise += o.grandTotalPaise;
       continue;
     }
+    if (o.paymentStatus !== 'paid') continue;
+
+    // Money received (also for refunded orders — the refund is shown separately).
+    s.received.paise += o.grandTotalPaise;
+    if (o.paymentMethod === 'upi') s.received.upiPaise += o.grandTotalPaise;
+    else s.received.cashPaise += o.grandTotalPaise;
+
     if (o.status === 'refunded') {
+      const back = refundOf(o);
       s.refunded.count++;
-      s.refunded.paise += o.grandTotalPaise;
-      continue;
+      s.refunded.paise += back;
+      if (o.refundMethod === 'upi') s.refunded.upiPaise += back;
+      else s.refunded.cashPaise += back;
     }
     if (!isCollected(o)) continue;
 
     s.completedCount++;
-    s.totalPaise += o.grandTotalPaise;
-    if (o.paymentMethod === 'upi') {
-      s.upiPaise += o.grandTotalPaise;
-      s.upiCount++;
-    } else {
-      s.cashPaise += o.grandTotalPaise;
-      s.cashCount++;
-    }
+    if (o.paymentMethod === 'upi') s.upiCount++;
+    else s.cashCount++;
     for (const item of o.items) {
       const key = `${item.productId}::${item.name}`;
       const t = tally.get(key) ?? { name: item.name, qty: 0, salesPaise: 0 };
@@ -71,6 +91,9 @@ export function summarize(orders: Order[]): SalesSummary {
     }
   }
 
+  s.totalPaise = s.received.paise - s.refunded.paise;
+  s.cashPaise = s.received.cashPaise - s.refunded.cashPaise;
+  s.upiPaise = s.received.upiPaise - s.refunded.upiPaise;
   s.products = [...tally.values()].sort((a, b) => b.qty - a.qty || a.name.localeCompare(b.name));
   return s;
 }
@@ -96,10 +119,14 @@ export function ordersToCsv(orders: Order[], title: string): string {
   lines.push(row([title]));
   lines.push('');
   lines.push(
-    row(['Order No', 'Date & Time', 'Status', 'Payment', 'Items', 'Total (Rs)', 'Counted in sales']),
+    row([
+      'Order No', 'Date & Time', 'Status', 'Payment', 'Items', 'Total (Rs)',
+      'Refund (Rs)', 'Refund by', 'Counted in sales',
+    ]),
   );
   const sorted = [...orders].sort((a, b) => orderTime(a) - orderTime(b));
   for (const o of sorted) {
+    const back = refundOf(o);
     lines.push(
       row([
         o.orderNumber,
@@ -108,6 +135,8 @@ export function ordersToCsv(orders: Order[], title: string): string {
         paymentLabel(o.paymentMethod),
         o.items.map((i) => `${i.name} x${i.qty}`).join('; '),
         rupees(o.grandTotalPaise),
+        back ? rupees(back) : '',
+        back ? paymentLabel(o.refundMethod ?? o.paymentMethod) : '',
         isCollected(o) ? 'yes' : 'no',
       ]),
     );
@@ -120,11 +149,17 @@ export function ordersToCsv(orders: Order[], title: string): string {
 
   lines.push('');
   lines.push(row(['Completed orders', s.completedCount]));
+  lines.push(row(['Money received (Rs)', rupees(s.received.paise)]));
+  lines.push(row(['Refunds given (Rs)', rupees(s.refunded.paise)]));
   lines.push(row(['Total sales collected (Rs)', rupees(s.totalPaise)]));
   lines.push(row(['Cash (Rs)', rupees(s.cashPaise)]));
+  lines.push(row(['  Cash received (Rs)', rupees(s.received.cashPaise)]));
+  lines.push(row(['  Cash refunds (Rs)', rupees(s.refunded.cashPaise)]));
   lines.push(row(['UPI (Rs)', rupees(s.upiPaise)]));
+  lines.push(row(['  UPI received (Rs)', rupees(s.received.upiPaise)]));
+  lines.push(row(['  UPI refunds (Rs)', rupees(s.refunded.upiPaise)]));
   lines.push(row(['Cancelled orders (excluded)', s.cancelled.count, rupees(s.cancelled.paise)]));
-  lines.push(row(['Refunded orders (excluded)', s.refunded.count, rupees(s.refunded.paise)]));
+  lines.push(row(['Refunded orders', s.refunded.count, rupees(s.refunded.paise)]));
 
   return lines.join('\r\n');
 }

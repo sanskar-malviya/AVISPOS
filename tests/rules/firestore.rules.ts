@@ -109,25 +109,34 @@ interface StatusChange {
   status?: 'cancelled' | 'refunded';
   reason?: string;
   by?: string;
-  audit?: false | Partial<{ amountPaise: number; type: string; reason: string; id: string }>;
+  /** Refund fields on the order. Refunds default to the full amount in cash; `false` = none. */
+  refund?: false | Partial<{ refundPaise: unknown; refundMethod: unknown }>;
+  audit?: false | Partial<{ amountPaise: number; type: string; reason: string; id: string; refundMethod: unknown }>;
 }
 /** Cancel/refund the way the app does: order update + audit entry in one batch. */
-function statusBatch({ db, status = 'cancelled', reason = 'Customer changed mind', by = 'owner1', audit = {} }: StatusChange) {
+function statusBatch({ db, status = 'cancelled', reason = 'Customer changed mind', by = 'owner1', refund, audit = {} }: StatusChange) {
   const b = writeBatch(db);
+  const refundFields: Record<string, unknown> =
+    refund === false ? {} : status === 'refunded' ? { refundPaise: 3000, refundMethod: 'cash', ...refund } : { ...refund };
   b.update(doc(db, 'orders/o1'), {
     status,
     statusReason: reason,
     statusChangedBy: by,
     statusChangedAt: serverTimestamp(),
+    ...refundFields,
   });
   if (audit !== false) {
+    const amount =
+      audit.amountPaise ?? (typeof refundFields.refundPaise === 'number' ? refundFields.refundPaise : 3000);
+    const method = 'refundMethod' in audit ? audit.refundMethod : refundFields.refundMethod;
     b.set(doc(db, 'audit', audit.id ?? `order-o1-${status}`), {
       type: audit.type ?? (status === 'refunded' ? 'refund' : 'order_cancel'),
       orderId: 'o1',
       orderNumber: `${DK}-0001`,
       before: 'completed',
       after: status,
-      amountPaise: audit.amountPaise ?? 3000,
+      amountPaise: amount,
+      ...(method !== undefined ? { refundMethod: method } : {}),
       reason: audit.reason ?? reason,
       who: by,
       at: serverTimestamp(),
@@ -391,8 +400,29 @@ describe('orders', () => {
     await assertSucceeds(statusBatch({ db: owner() }));
   });
 
-  it('a refund is recorded as a refund', async () => {
+  it('a refund is recorded as a refund, with its amount and method', async () => {
     await assertSucceeds(statusBatch({ db: owner(), status: 'refunded' }));
+  });
+
+  it('a refund may be partial and given back by the other method', async () => {
+    await assertSucceeds(
+      statusBatch({ db: owner(), status: 'refunded', refund: { refundPaise: 1000, refundMethod: 'upi' } }),
+    );
+  });
+
+  it('a refund must state a valid amount and method, and the audit entry must match', async () => {
+    const r = (refund: StatusChange['refund'], audit?: StatusChange['audit']) =>
+      statusBatch({ db: owner(), status: 'refunded', refund, audit });
+    await assertFails(r(false)); // no amount / method
+    await assertFails(r({ refundPaise: 0 }));
+    await assertFails(r({ refundPaise: 3001 })); // more than the order
+    await assertFails(r({ refundPaise: 10.5 }));
+    await assertFails(r({ refundMethod: 'card' }));
+    await assertFails(r(undefined, { amountPaise: 1 })); // audit says a different amount
+    await assertFails(r(undefined, { refundMethod: 'upi' })); // audit says a different method
+    // A cancellation can't carry refund fields.
+    await assertFails(statusBatch({ db: owner(), refund: { refundPaise: 3000, refundMethod: 'cash' } }));
+    await assertFails(statusBatch({ db: owner(), audit: { refundMethod: 'cash' } }));
   });
 
   it('cancelling WITHOUT an audit entry, or with a false one, is rejected', async () => {

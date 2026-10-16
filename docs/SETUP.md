@@ -74,9 +74,14 @@ settings or look at reports.
 
 ## Cancelling or refunding an order
 
-**Orders →** tap the order → **Cancel order** or **Mark refunded** → enter a reason. The order stays in
-history marked Cancelled/Refunded and is removed from the sales totals. The change is recorded in the audit
-log. Sales can never be deleted.
+**Orders →** tap the order → **Cancel order** → enter a reason. The order stays in history marked
+Cancelled and is removed from the sales totals.
+
+**Mark refunded** asks for the **refund amount** (the full amount is filled in; lower it for a partial
+refund), **how it was given back (Cash or UPI)** and a reason. This can differ from how the customer paid:
+a UPI order refunded in cash takes ₹ off the **Cash** figure, not UPI, so the drawer count and your UPI
+statement both stay right. The Orders screen shows "received − refunded" under each total and lists the
+refunds given in cash and by UPI. Both changes are recorded in the audit log. Sales can never be deleted.
 
 ## Correcting Cash / UPI on an order
 

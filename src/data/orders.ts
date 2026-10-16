@@ -229,7 +229,7 @@ export function mapOrder(id: string, data: Record<string, unknown>): Order {
   const ts = data.createdAt as Timestamp | null | undefined;
   const createdAt =
     ts && typeof (ts as Timestamp).toMillis === 'function' ? (ts as Timestamp).toMillis() : null;
-  return {
+  const order: Order = {
     id,
     orderNumber: String(data.orderNumber ?? ''),
     orderNumberProvisional: Boolean(data.orderNumberProvisional),
@@ -256,6 +256,16 @@ export function mapOrder(id: string, data: Record<string, unknown>): Order {
     statusReason: String(data.statusReason ?? ''),
     ...(data.lastPaymentAuditId ? { paymentCorrected: true } : {}),
   };
+  if (order.status === 'refunded') {
+    // Orders refunded before the amount/method were recorded: full amount, same way it was paid.
+    const paise = Number(data.refundPaise);
+    order.refundPaise = Number.isInteger(paise) && paise > 0 ? paise : order.grandTotalPaise;
+    order.refundMethod =
+      data.refundMethod === 'upi' || data.refundMethod === 'cash'
+        ? data.refundMethod
+        : order.paymentMethod;
+  }
+  return order;
 }
 
 /**
@@ -329,25 +339,45 @@ export function recordReprint(id: string): Promise<void> {
   return updateDoc(doc(ordersCol, id), { reprintCount: increment(1) });
 }
 
+export interface RefundInput {
+  /** Amount given back, 1 … grandTotalPaise (a partial refund keeps the rest as sales). */
+  refundPaise: number;
+  /** How it was given back — may differ from how the customer paid. */
+  refundMethod: PaymentMethod;
+}
+
 /**
  * Mark an order cancelled or refunded (owner only). Orders are never deleted.
- * The status change and its audit entry are written in ONE batch; the security
- * rules reject either without the other, so the audit trail can't be skipped
- * (spec §8, §11).
+ * A refund records how much went back and by which method, so the report can
+ * show cash and UPI correctly. The status change and its audit entry are
+ * written in ONE batch; the security rules reject either without the other, so
+ * the audit trail can't be skipped (spec §8, §11).
  */
 export async function changeOrderStatus(
   order: Pick<Order, 'id' | 'orderNumber' | 'grandTotalPaise'>,
   status: 'cancelled' | 'refunded',
   reason: string,
+  refund?: RefundInput,
 ): Promise<void> {
   const uid = auth.currentUser?.uid ?? '';
   const statusReason = reason.trim().slice(0, 200);
+  if (status === 'refunded') {
+    if (!refund) throw new Error('changeOrderStatus: refund amount and method are required');
+    if (
+      !Number.isInteger(refund.refundPaise) ||
+      refund.refundPaise <= 0 ||
+      refund.refundPaise > order.grandTotalPaise
+    )
+      throw new Error('Refund amount must be between 1 and the order total.');
+  }
+  const isRefund = status === 'refunded' && refund !== undefined;
   const batch = writeBatch(db);
   batch.update(doc(ordersCol, order.id), {
     status,
     statusReason,
     statusChangedBy: uid,
     statusChangedAt: serverTimestamp(),
+    ...(isRefund ? { refundPaise: refund.refundPaise, refundMethod: refund.refundMethod } : {}),
   });
   batch.set(doc(db, 'audit', `order-${order.id}-${status}`), {
     type: status === 'refunded' ? 'refund' : 'order_cancel',
@@ -355,7 +385,8 @@ export async function changeOrderStatus(
     orderNumber: order.orderNumber,
     before: 'completed',
     after: status,
-    amountPaise: order.grandTotalPaise,
+    amountPaise: isRefund ? refund.refundPaise : order.grandTotalPaise,
+    ...(isRefund ? { refundMethod: refund.refundMethod } : {}),
     reason: statusReason,
     who: uid,
     at: serverTimestamp(),

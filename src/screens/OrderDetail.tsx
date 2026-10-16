@@ -12,7 +12,7 @@ import {
   subscribeOrder,
 } from '../data/orders';
 import { printOrderReceipt, printTokenSlip } from '../printer';
-import { formatINR } from '../lib/money';
+import { formatINR, paiseToRupees } from '../lib/money';
 import { formatDateTime, orderTime, paymentLabel } from '../lib/format';
 import type { Order, PaymentMethod } from '../lib/types';
 
@@ -32,6 +32,8 @@ export function OrderDetail() {
   const [saving, setSaving] = useState(false);
   const [payTo, setPayTo] = useState<PaymentMethod | null>(null);
   const [payNote, setPayNote] = useState('');
+  const [refundRupees, setRefundRupees] = useState('');
+  const [refundMethod, setRefundMethod] = useState<PaymentMethod>('cash');
 
   useEffect(
     () =>
@@ -84,16 +86,39 @@ export function OrderDetail() {
     setPrinting(false);
   }
 
+  const refundPaise = Math.round(Number(refundRupees) * 100);
+  const refundValid =
+    Number.isInteger(Number(refundRupees)) && refundPaise >= 100 && refundPaise <= current.grandTotalPaise;
+
+  function startRefund() {
+    setRefundRupees(String(paiseToRupees(current.grandTotalPaise)));
+    setRefundMethod(current.paymentMethod);
+    setAction('refunded');
+  }
+
   async function applyStatus() {
     if (!action) return;
     if (!reason.trim()) {
       toast.error('Please enter a reason.');
       return;
     }
+    if (action === 'refunded' && !refundValid) {
+      toast.error(`Enter a whole-rupee refund between ₹1 and ${formatINR(current.grandTotalPaise)}.`);
+      return;
+    }
     setSaving(true);
     try {
-      await changeOrderStatus(current, action, reason);
-      toast.success(action === 'cancelled' ? 'Order cancelled' : 'Order marked as refunded');
+      await changeOrderStatus(
+        current,
+        action,
+        reason,
+        action === 'refunded' ? { refundPaise, refundMethod } : undefined,
+      );
+      toast.success(
+        action === 'cancelled'
+          ? 'Order cancelled'
+          : `Refund of ${formatINR(refundPaise)} by ${paymentLabel(refundMethod)} recorded`,
+      );
       setAction(null);
       setReason('');
     } catch (e) {
@@ -135,6 +160,16 @@ export function OrderDetail() {
         (current.paymentCorrected ? ' (corrected by owner)' : ''),
     ],
     ['Status', current.status + (current.statusReason ? ` — ${current.statusReason}` : '')],
+    ...(current.status === 'refunded'
+      ? ([
+          [
+            'Refund',
+            `${formatINR(current.refundPaise ?? current.grandTotalPaise)} given back by ${paymentLabel(
+              current.refundMethod ?? current.paymentMethod,
+            )}`,
+          ],
+        ] as [string, string][])
+      : []),
     ['Receipt reprints', String(current.reprintCount)],
     ['Sync', pending ? 'Waiting to sync (saved on device)' : 'Saved to cloud'],
     [
@@ -231,16 +266,18 @@ export function OrderDetail() {
                     <button className="btn-danger" onClick={() => setAction('cancelled')}>
                       Cancel order
                     </button>
-                    <button className="btn-danger" onClick={() => setAction('refunded')}>
+                    <button className="btn-danger" onClick={startRefund}>
                       Mark refunded
                     </button>
                   </div>
                 </>
               )}
               <p className="text-xs text-stone-500">
-                Sales are never deleted. Cancelled and refunded orders stay in history but are
-                excluded from sales totals. Changing the payment method only moves the amount
-                between the Cash and UPI totals. Every change is recorded in the audit log.
+                Sales are never deleted. Cancelled orders stay in history but are excluded from
+                sales totals. A refund records how much went back and whether it was given in cash
+                or by UPI, so the Cash and UPI figures stay right. Changing the payment method only
+                moves the amount between the Cash and UPI totals. Every change is recorded in the
+                audit log.
               </p>
             </div>
           </div>
@@ -259,10 +296,62 @@ export function OrderDetail() {
         cancelLabel="Keep order"
         message={
           <div>
-            <p>
-              {formatINR(current.grandTotalPaise)} will be removed from sales totals. This is
-              recorded in the audit log.
-            </p>
+            {action === 'cancelled' ? (
+              <p>
+                {formatINR(current.grandTotalPaise)} will be removed from sales totals. This is
+                recorded in the audit log.
+              </p>
+            ) : (
+              <>
+                <p>
+                  The customer paid {formatINR(current.grandTotalPaise)} by{' '}
+                  {paymentLabel(current.paymentMethod)}. Enter how much you gave back and how.
+                </p>
+                <label className="block text-sm font-semibold text-stone-700 mt-3 mb-1">
+                  Refund amount (₹)
+                </label>
+                <input
+                  className="input w-full"
+                  type="number"
+                  inputMode="numeric"
+                  min={1}
+                  max={paiseToRupees(current.grandTotalPaise)}
+                  step={1}
+                  value={refundRupees}
+                  onChange={(e) => setRefundRupees(e.target.value)}
+                />
+                <span className="block text-sm font-semibold text-stone-700 mt-3 mb-1">
+                  Refund given by
+                </span>
+                <div className="flex gap-2">
+                  {(['cash', 'upi'] as PaymentMethod[]).map((m) => (
+                    <button
+                      type="button"
+                      key={m}
+                      aria-pressed={refundMethod === m}
+                      onClick={() => setRefundMethod(m)}
+                      className={
+                        'btn flex-1 min-h-0 py-2 border-2 ' +
+                        (refundMethod === m
+                          ? 'border-tandoori-700 bg-tandoori-700 text-white'
+                          : 'border-stone-200 bg-white')
+                      }
+                    >
+                      {paymentLabel(m)}
+                    </button>
+                  ))}
+                </div>
+                {refundValid && (
+                  <p className="text-xs text-stone-600 mt-2">
+                    {formatINR(refundPaise)} will be taken off the{' '}
+                    <strong>{paymentLabel(refundMethod)}</strong> total
+                    {refundPaise < current.grandTotalPaise
+                      ? `; the remaining ${formatINR(current.grandTotalPaise - refundPaise)} stays as sales.`
+                      : '.'}
+                  </p>
+                )}
+              </>
+            )}
             <label className="block text-sm font-semibold text-stone-700 mt-3 mb-1">Reason</label>
             <textarea
               className="input w-full"

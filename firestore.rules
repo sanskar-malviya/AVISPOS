@@ -116,12 +116,22 @@ service cloud.firestore {
         && request.resource.data.reprintCount == resource.data.reprintCount + 1;
     }
 
+    // A refund records how much went back (1 … total, partial allowed) and by
+    // which method, so cash and UPI figures stay right. A cancel records neither.
     function isStatusChange(orderId) {
       let next = request.resource.data;
+      let changed = next.diff(resource.data).affectedKeys();
       return resource.data.status == 'completed'
         && next.status in ['cancelled', 'refunded']
-        && next.diff(resource.data).affectedKeys()
-             .hasOnly(['status', 'statusReason', 'statusChangedBy', 'statusChangedAt'])
+        && ((next.status == 'cancelled'
+              && changed.hasOnly(['status', 'statusReason', 'statusChangedBy', 'statusChangedAt']))
+            || (next.status == 'refunded'
+              && changed.hasOnly(['status', 'statusReason', 'statusChangedBy', 'statusChangedAt',
+                                  'refundPaise', 'refundMethod'])
+              && next.refundPaise is int
+              && next.refundPaise > 0
+              && next.refundPaise <= next.grandTotalPaise
+              && next.refundMethod in ['cash', 'upi']))
         && next.statusChangedBy == request.auth.uid
         && next.statusChangedAt == request.time
         && next.statusReason is string
@@ -213,13 +223,20 @@ service cloud.firestore {
       let after = getAfter(docPath('orders', a.orderId)).data;
       return a.type in ['order_cancel', 'refund']
         && a.keys().hasOnly(['type', 'orderId', 'orderNumber', 'before', 'after',
-                             'amountPaise', 'reason', 'who', 'at'])
+                             'amountPaise', 'refundMethod', 'reason', 'who', 'at'])
         && a.orderId is string
         && entryId == 'order-' + a.orderId + '-' + a.after
         && (a.type == 'refund') == (a.after == 'refunded')
         && a.before == 'completed' && before.status == 'completed'
         && after.status == a.after
-        && a.amountPaise == after.grandTotalPaise
+        // The entry states what actually went out: the refund amount and
+        // method for a refund, the whole order for a cancellation.
+        && ((a.type == 'refund'
+              && a.amountPaise == after.refundPaise
+              && a.refundMethod == after.refundMethod)
+            || (a.type == 'order_cancel'
+              && a.amountPaise == after.grandTotalPaise
+              && !('refundMethod' in a)))
         && a.orderNumber == after.orderNumber
         && a.reason == after.statusReason
         && a.who == request.auth.uid

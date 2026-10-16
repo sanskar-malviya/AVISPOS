@@ -57,6 +57,9 @@ export interface Order {
   source: OrderSource;
   statusReason: string; // reason given for cancel/refund ('' otherwise)
   paymentCorrected?: boolean; // true once the owner changed cash↔UPI after the sale
+  /** Refunded orders only: how much went back and how (defaults to the full amount, same method). */
+  refundPaise?: number;
+  refundMethod?: PaymentMethod;
 }
 
 export type PaperWidth = '58' | '80';
