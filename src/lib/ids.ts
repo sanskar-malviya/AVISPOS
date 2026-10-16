@@ -71,6 +71,12 @@ export function dateKey(d: Date = new Date(), startHour: number = dayStartHour):
   return `${y}${m}${day}`;
 }
 
+/** "YYYYMMDD" shifted by `days` (negative allowed), calendar arithmetic. */
+export function addDays(dk: string, days: number): string {
+  const d = new Date(Number(dk.slice(0, 4)), Number(dk.slice(4, 6)) - 1, Number(dk.slice(6, 8)) + days);
+  return dateKey(d, 0);
+}
+
 /** SHA-256 hex digest (used to hash the owner PIN before storing). */
 export async function sha256Hex(input: string): Promise<string> {
   const data = new TextEncoder().encode(input);

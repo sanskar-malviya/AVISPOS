@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { subscribeOrdersInRange, findByOrderNumber } from '../data/orders';
+import { useShopData } from '../app/data';
 import { useToast } from '../components/Toast';
-import { dateKey } from '../lib/ids';
+import { addDays, dateKey } from '../lib/ids';
 import { formatINR } from '../lib/money';
 import {
   dateKeyToInput,
@@ -71,7 +72,14 @@ function Stat({ label, value, sub }: { label: string; value: string; sub?: strin
 export function Orders() {
   const navigate = useNavigate();
   const toast = useToast();
+  const { settings } = useShopData();
+  const dayStart = settings.dayStartHour;
   const today = dateKey();
+  // The business day an order belongs to, from the time it was actually sold.
+  // Orders saved before the "business day starts at" setting was changed
+  // carry the old day in `dateKey`; this groups them the way the owner now
+  // expects without touching the stored data.
+  const businessDay = (o: Order) => dateKey(new Date(orderTime(o)), dayStart);
   const [from, setFrom] = useState(() => loadRange(today).from);
   const [to, setTo] = useState(() => loadRange(today).to);
   useEffect(() => saveRange(from, to, today), [from, to, today]);
@@ -84,11 +92,18 @@ export function Orders() {
   useEffect(() => {
     setLoading(true);
     const [a, b] = from <= to ? [from, to] : [to, from];
+    // The stored day and the business day can differ by one (see businessDay),
+    // so fetch a day either side and keep what falls in the range.
     return subscribeOrdersInRange(
-      a,
-      b,
+      addDays(a, -1),
+      addDays(b, 1),
       (list) => {
-        setOrders(list);
+        setOrders(
+          list.filter((o) => {
+            const bd = businessDay(o);
+            return bd >= a && bd <= b;
+          }),
+        );
         setLoading(false);
         setError(null);
       },
@@ -97,7 +112,7 @@ export function Orders() {
         setLoading(false);
       },
     );
-  }, [from, to]);
+  }, [from, to, dayStart]);
 
   // Orders still waiting to sync have no server timestamp yet (offline sales).
   const pendingIds = useMemo(
@@ -271,7 +286,7 @@ export function Orders() {
                         <div className="font-bold truncate">{o.orderNumber}</div>
                         <div className="text-xs text-stone-500 truncate">
                           <span className="sm:hidden">{paymentLabel(o.paymentMethod)} · </span>
-                          {from !== to && `${formatDateKey(o.dateKey)} · `}
+                          {from !== to && `${formatDateKey(businessDay(o))} · `}
                           {formatTime(orderTime(o))} ·{' '}
                           {o.items.map((i) => `${i.name} ×${i.qty}`).join(', ')}
                         </div>

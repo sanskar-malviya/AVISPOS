@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { dateKey } from '../src/lib/ids';
+import { addDays, dateKey } from '../src/lib/ids';
 
 describe('business-day key', () => {
   const at = (h: number, m = 0) => new Date(2026, 9, 15, h, m); // 15 Oct 2026, local time
@@ -16,6 +16,12 @@ describe('business-day key', () => {
     expect(dateKey(at(3, 0), 3)).toBe('20261015');
     expect(dateKey(at(14, 0), 3)).toBe('20261015');
     expect(dateKey(at(23, 59), 3)).toBe('20261015');
+  });
+
+  it('addDays shifts a key across month and year ends', () => {
+    expect(addDays('20261016', -1)).toBe('20261015');
+    expect(addDays('20261031', 1)).toBe('20261101');
+    expect(addDays('20260101', -1)).toBe('20251231');
   });
 
   it('rolls over months and years correctly', () => {
